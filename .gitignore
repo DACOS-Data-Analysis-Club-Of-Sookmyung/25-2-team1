@@ -7,7 +7,18 @@ outputs/**
 !outputs/README.md
 
 # env / python
-.env
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
 .venv/
+.env
+
+# data/artifacts
+data/
+outputs/
+
+# OS
+.DS_Store
+Thumbs.db
