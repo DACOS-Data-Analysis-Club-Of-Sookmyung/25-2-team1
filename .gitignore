@@ -1,0 +1,13 @@
+# runtime (ignored)
+data/**
+outputs/**
+
+# keep folder docs
+!data/README.md
+!outputs/README.md
+
+# env / python
+.env
+__pycache__/
+*.pyc
+.venv/
