@@ -3,5 +3,7 @@
   "section_id": "4.3",
   "title": "재무활동 현금흐름",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1300 }
+  "llm": { "temperature": 0.2, "max_tokens": 1300 },
+  "metrics_path": "metrics/metrics_S04_3.json",
+  "evidence_path": "evidence/evidence_S04_3.json"
 }

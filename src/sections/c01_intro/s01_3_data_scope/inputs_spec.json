@@ -6,5 +6,7 @@
   "llm": {
     "temperature": 0.2,
     "max_tokens": 900
-  }
+  },
+  "metrics_path": "metrics/metrics_S01_3.json",
+  "evidence_path": "evidence/evidence_S01_3.json"
 }

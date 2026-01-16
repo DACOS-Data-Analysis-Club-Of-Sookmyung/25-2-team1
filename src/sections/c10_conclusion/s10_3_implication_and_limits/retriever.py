@@ -9,7 +9,11 @@ def _read_json(p: Path) -> Dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 def build_ctx(workdir: Path, spec: Dict[str, Any]) -> Dict[str, Any]:
-    inputs = load_inputs(workdir)
+    inputs = load_inputs(
+        workdir,
+        metrics_path=spec.get("metrics_path"),
+        evidence_path=spec.get("evidence_path"),
+    )
     meta = inputs["meta"]
 
     out_dir = Path("outputs/sections")

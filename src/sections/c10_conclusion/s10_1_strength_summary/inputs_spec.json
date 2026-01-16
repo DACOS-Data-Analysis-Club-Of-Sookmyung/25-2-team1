@@ -3,5 +3,7 @@
   "section_id": "10.1",
   "title": "재무적 강점 요약",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1400 }
+  "llm": { "temperature": 0.2, "max_tokens": 1400 },
+  "metrics_path": "metrics/metrics_S10_1.json",
+  "evidence_path": "evidence/evidence_S10_1.json"
 }

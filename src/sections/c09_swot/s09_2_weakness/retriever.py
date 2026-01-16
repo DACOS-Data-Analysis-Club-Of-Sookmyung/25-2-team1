@@ -54,7 +54,11 @@ def _split_weakness(metric_rows: Dict[str, Dict[str, Any]]) -> Tuple[List[Dict[s
     return core, aux
 
 def build_ctx(workdir: Path, spec: Dict[str, Any]) -> Dict[str, Any]:
-    inputs = load_inputs(workdir)
+    inputs = load_inputs(
+        workdir,
+        metrics_path=spec.get("metrics_path"),
+        evidence_path=spec.get("evidence_path"),
+    )
     meta = inputs["meta"]
     metric_rows = inputs["metric_rows"]
 

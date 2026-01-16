@@ -3,5 +3,7 @@
   "section_id": "2.4",
   "title": "재무 건전성 종합 평가",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1500 }
+  "llm": { "temperature": 0.2, "max_tokens": 1500 },
+  "metrics_path": "metrics/metrics_S02_4.json",
+  "evidence_path": "evidence/evidence_S02_4.json"
 }

@@ -3,5 +3,7 @@
   "section_id": "7.5",
   "title": "수익성 구조에 대한 종합 해석",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 2000 }
+  "llm": { "temperature": 0.2, "max_tokens": 2000 },
+  "metrics_path": "metrics/metrics_S07_5.json",
+  "evidence_path": "evidence/evidence_S07_5.json"
 }

@@ -3,5 +3,7 @@
   "section_id": "7.3",
   "title": "듀퐁 3요인 분석",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1800 }
+  "llm": { "temperature": 0.2, "max_tokens": 1800 },
+  "metrics_path": "metrics/metrics_S07_3.json",
+  "evidence_path": "evidence/evidence_S07_3.json"
 }

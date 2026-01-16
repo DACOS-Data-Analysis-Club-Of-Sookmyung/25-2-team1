@@ -3,5 +3,7 @@
   "section_id": "5.4",
   "title": "유동성에 대한 종합 평가",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1700 }
+  "llm": { "temperature": 0.2, "max_tokens": 1700 },
+  "metrics_path": "metrics/metrics_S05_4.json",
+  "evidence_path": "evidence/evidence_S05_4.json"
 }

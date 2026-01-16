@@ -3,5 +3,7 @@
   "section_id": "8.2",
   "title": "투자활동 장·단점",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1700 }
+  "llm": { "temperature": 0.2, "max_tokens": 1700 },
+  "metrics_path": "metrics/metrics_S08_2.json",
+  "evidence_path": "evidence/evidence_S08_2.json"
 }
