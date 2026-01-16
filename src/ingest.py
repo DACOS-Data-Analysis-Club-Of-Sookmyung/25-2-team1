@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import os, re
-from typing import List, Dict, Optional, Tuple
+import os, re, time
+from typing import Iterable, List, Dict, Optional, Tuple
 
 import duckdb
 import numpy as np
@@ -21,7 +21,27 @@ from .utils.html import (
 from .utils.text import chunk_text, clean_title_ko, detect_statement_type_from_title
 from .utils.dart import extract_biz_sections_from_xml, extract_financial_sections_from_xml
 
-# ========== DB schema / migration ==========
+
+# -----------------------------
+# small helpers
+# -----------------------------
+def _batched(seq: List[Tuple], batch_size: int):
+    for i in range(0, len(seq), batch_size):
+        yield seq[i:i + batch_size]
+
+
+def _envflag(name: str, default: str = "0") -> bool:
+    return (os.environ.get(name, default) or default).strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+LOG_TABLE_DETAIL = _envflag("INGEST_LOG_TABLE_DETAIL", "1")  # 상세 로그 켜고/끄기
+LOG_SQL_BATCH = _envflag("INGEST_LOG_SQL_BATCH", "1")        # 배치 insert 로그
+DEFAULT_BATCH = int(os.environ.get("INGEST_SQL_BATCH", "2000") or 2000)
+
+
+# ============================
+# DB schema / migration
+# ============================
 def _table_exists(con: duckdb.DuckDBPyConnection, name: str) -> bool:
     r = con.execute("""
       SELECT 1
@@ -31,9 +51,11 @@ def _table_exists(con: duckdb.DuckDBPyConnection, name: str) -> bool:
     """, [name]).fetchone()
     return r is not None
 
+
 def _get_existing_cols(con: duckdb.DuckDBPyConnection, table: str) -> List[str]:
     rows = con.execute(f"PRAGMA table_info('{table}')").fetchall()
     return [r[1] for r in rows]
+
 
 def init_db(con: duckdb.DuckDBPyConnection):
     con.execute("""
@@ -180,6 +202,7 @@ def init_db(con: duckdb.DuckDBPyConnection):
     );
     """)
 
+
 def ensure_table_schema(con: duckdb.DuckDBPyConnection):
     init_db(con)
 
@@ -212,7 +235,10 @@ def ensure_table_schema(con: duckdb.DuckDBPyConnection):
         if "text_for_embed" not in cols:
             con.execute("ALTER TABLE rag_text_chunks ADD COLUMN text_for_embed VARCHAR")
 
-# ========== Text chunk upsert ==========
+
+# ============================
+# Text chunk upsert
+# ============================
 def upsert_text_chunks(
     con: duckdb.DuckDBPyConnection,
     report_id: str,
@@ -237,6 +263,7 @@ def upsert_text_chunks(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (chunk_id, report_id, section_id, section_code, section_type, note_no, idx, c, c))
 
+
 def upsert_text_chunks_from_text(
     con: duckdb.DuckDBPyConnection,
     report_id: str,
@@ -259,8 +286,10 @@ def upsert_text_chunks_from_text(
     embed_chunks = chunk_text(text_for_embed, chunk_size, chunk_overlap)
 
     m = max(len(chunks), len(embed_chunks))
-    while len(chunks) < m: chunks.append("")
-    while len(embed_chunks) < m: embed_chunks.append("")
+    while len(chunks) < m:
+        chunks.append("")
+    while len(embed_chunks) < m:
+        embed_chunks.append("")
 
     for idx in range(m):
         c = (chunks[idx] or "").strip()
@@ -274,9 +303,13 @@ def upsert_text_chunks_from_text(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (chunk_id, report_id, section_id, section_code, section_type, note_no, idx, c, e))
 
-# ========== Table parsing helpers ==========
+
+# ============================
+# Table parsing helpers
+# ============================
 _FY_LINE_RE = re.compile(r"제\s*(\d+)\s*기\s*([0-9]{4})\.\s*([0-9]{2})\.\s*([0-9]{2})", re.I)
 _UNIT_RE = re.compile(r"\(단위\s*:\s*([^)]+)\)", re.I)
+
 
 def extract_fy_map(section_html: str) -> Dict[str, Tuple[int, str]]:
     fy_map = {}
@@ -287,6 +320,7 @@ def extract_fy_map(section_html: str) -> Dict[str, Tuple[int, str]]:
         key = f"제{gisu}기"
         fy_map[key.replace(" ", "")] = (y, f"{y}-{mm}-{dd}")
     return fy_map
+
 
 def extract_unit(section_html: str) -> Tuple[str, int, str]:
     text = strip_html_keep_lines(section_html)
@@ -305,6 +339,7 @@ def extract_unit(section_html: str) -> Tuple[str, int, str]:
         mult = 1
     return unit_label, mult, "KRW"
 
+
 def attach_parents(rows: List[dict]) -> None:
     stack = []
     for r in rows:
@@ -314,6 +349,7 @@ def attach_parents(rows: List[dict]) -> None:
         parent = stack[-1][1] if stack else None
         r["parent_row_idx"] = parent
         stack.append((il, r["row_idx"]))
+
 
 def rollup_note_nos_to_parents(rows: List[dict]) -> None:
     children = {}
@@ -341,6 +377,7 @@ def rollup_note_nos_to_parents(rows: List[dict]) -> None:
     roots = [r["row_idx"] for r in rows if r.get("parent_row_idx") is None]
     for rt in roots:
         dfs(rt)
+
 
 def parse_fin_table_from_section(section_html: str) -> List[dict]:
     soup = BeautifulSoup(section_html, "lxml")
@@ -432,6 +469,7 @@ def parse_fin_table_from_section(section_html: str) -> List[dict]:
 
     return tables
 
+
 def parse_any_table_from_section(section_html: str) -> List[dict]:
     soup = BeautifulSoup(section_html, "lxml")
     out = []
@@ -493,6 +531,7 @@ def parse_any_table_from_section(section_html: str) -> List[dict]:
 
     return out
 
+
 def upsert_tables_common(
     con: duckdb.DuckDBPyConnection,
     report_id: str,
@@ -502,6 +541,10 @@ def upsert_tables_common(
     table_title_prefix: str,
     table_parser: str = "fin",
 ):
+    """
+    III-2 (FS) 테이블 업서트.
+    여기서도 표 크면 rag_table_cells insert가 병목될 수 있어서 batch + 로그를 추가.
+    """
     unit_label, unit_mult, currency = extract_unit(section_html)
     fy_map = extract_fy_map(section_html)
 
@@ -565,14 +608,19 @@ def upsert_tables_common(
             row_rows
         )
 
-        # cells
-        cell_rows = []
-        for (row_idx, col_idx, text_value, num_value, decimals, acontext) in t["cells"]:
-            cell_rows.append((table_id, row_idx, col_idx, text_value, num_value, decimals, acontext))
-        con.executemany(
-            "INSERT OR REPLACE INTO rag_table_cells (table_id, row_idx, col_idx, text_value, num_value, decimals, acontext) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            cell_rows
-        )
+        # cells (batch + time)
+        cell_rows = [(table_id, row_idx, col_idx, text_value, num_value, decimals, acontext)
+                     for (row_idx, col_idx, text_value, num_value, decimals, acontext) in t["cells"]]
+
+        if cell_rows:
+            t_cell = time.perf_counter()
+            for batch in _batched(cell_rows, DEFAULT_BATCH):
+                con.executemany(
+                    "INSERT OR REPLACE INTO rag_table_cells (table_id, row_idx, col_idx, text_value, num_value, decimals, acontext) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    batch
+                )
+            if LOG_SQL_BATCH:
+                print(f"[TIME] FS table cells ({len(cell_rows)}) batch_insert: {time.perf_counter() - t_cell:.2f}s (table_id={table_id})")
 
         # FS facts
         if table_parser == "fin":
@@ -619,7 +667,10 @@ def upsert_tables_common(
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, facts_rows)
 
-# ========== Notes robust table + flow token ==========
+
+# ============================
+# Notes robust table + flow token
+# ============================
 def _norm_cell_text(s: str) -> str:
     if s is None:
         return ""
@@ -628,6 +679,7 @@ def _norm_cell_text(s: str) -> str:
     s = s.replace("∼", "~")
     s = normalize_space(s)
     return s
+
 
 def html_table_to_grid(table_tag) -> List[List[dict]]:
     trs = table_tag.find_all("tr")
@@ -693,6 +745,7 @@ def html_table_to_grid(table_tag) -> List[List[dict]]:
             r.append({"text": "", "is_header": False, "attrs": {}})
     return grid
 
+
 def parse_any_single_table(table_tag) -> Optional[dict]:
     grid = html_table_to_grid(table_tag)
     if len(grid) < 2:
@@ -746,7 +799,9 @@ def parse_any_single_table(table_tag) -> Optional[dict]:
         "raw_table_html": str(table_tag),
     }
 
+
 _TABLE_TOKEN_RE = re.compile(r"\[\[TABLE:([0-9a-f]{40})\]\]")
+
 
 def upsert_notes_tables_and_text(
     con: duckdb.DuckDBPyConnection,
@@ -759,6 +814,19 @@ def upsert_notes_tables_and_text(
     chunk_size: int,
     chunk_overlap: int,
 ):
+    """
+    III-3 Notes 처리 (최적화 버전)
+
+    ✔ 신규 ingest 기준:
+      - table_id 단위로 DELETE → INSERT (OR REPLACE 제거)
+      - cell 대용량 배치 insert (진행률 로그 포함)
+      - 병목 지점 정밀 타이밍 로그
+    """
+
+    # 🔧 튜닝 파라미터
+    BATCH = 20000            # cell 배치 크기 (2만~5만 권장)
+    PROGRESS_EVERY = 10      # cell batch N회마다 진행 로그
+
     soup = BeautifulSoup(section_html, "lxml")
     root = soup.body if soup.body else soup
 
@@ -766,64 +834,169 @@ def upsert_notes_tables_and_text(
     table_order = 0
     unit_label, unit_mult, currency = extract_unit(section_html)
 
+    t0 = time.perf_counter()
+    n_tables_seen = 0
+
     for node in root.descendants:
         if getattr(node, "name", None) and node.name.lower() == "table":
+            n_tables_seen += 1
+
+            # ---------- (1) table parse ----------
+            t_parse0 = time.perf_counter()
             parsed = parse_any_single_table(node)
-            if parsed:
-                table_id = stable_id(section_id, f"ntable{table_order}")
-                table_title = f"{section_code} {title_ko} / ntable{table_order}"
+            t_parse = time.perf_counter() - t_parse0
 
-                con.execute("""
-                  INSERT OR REPLACE INTO rag_tables
-                  (table_id, section_id, statement_type, unit_label, unit_multiplier, currency,
-                   raw_table_html, table_title, table_order)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (table_id, section_id, "NOTE", unit_label, unit_mult, currency,
-                      parsed["raw_table_html"], table_title, int(table_order)))
-
-                col_rows = []
-                for col_idx, header in enumerate(parsed["col_headers"]):
-                    col_rows.append((table_id, col_idx, "note_col", header or "", None, None))
-                con.executemany(
-                    "INSERT OR REPLACE INTO rag_table_cols (table_id, col_idx, col_type, header_ko, period_end, fiscal_year) VALUES (?, ?, ?, ?, ?, ?)",
-                    col_rows
+            if LOG_TABLE_DETAIL:
+                print(
+                    f"[DBG] NOTE parse table#{n_tables_seen} "
+                    f"(note_no={note_no}, section={section_code}) took {t_parse:.2f}s"
                 )
 
-                row_rows = []
-                for r in parsed["rows"]:
-                    row_rows.append((
-                        table_id, r["row_idx"], r["label_ko"], r["label_clean"],
-                        int(r.get("indent_level") or 0), r.get("parent_row_idx"),
-                        bool(r.get("is_abstract")), r.get("ifrs_code"),
-                        r.get("note_refs_raw"), r.get("note_nos") or []
-                    ))
-                con.executemany("""
-                    INSERT OR REPLACE INTO rag_table_rows
-                    (table_id, row_idx, label_ko, label_clean, indent_level, parent_row_idx,
-                     is_abstract, ifrs_code, note_refs_raw, note_nos)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, row_rows)
+            if not parsed:
+                continue
 
-                cell_rows = []
-                for (ri, ci, tv, nv, dec, actx) in parsed["cells"]:
-                    cell_rows.append((table_id, ri, ci, tv, nv, dec, actx))
-                con.executemany(
-                    "INSERT OR REPLACE INTO rag_table_cells (table_id, row_idx, col_idx, text_value, num_value, decimals, acontext) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    cell_rows
+            table_id = stable_id(section_id, f"ntable{table_order}")
+            table_title = f"{section_code} {title_ko} / ntable{table_order}"
+
+            # ---------- (2) 기존 table_id 데이터 제거 (핵심!) ----------
+            # 신규 ingest에서는 upsert 불필요 → DELETE 후 INSERT가 훨씬 빠름
+            con.execute("DELETE FROM rag_table_cells WHERE table_id = ?", [table_id])
+            con.execute("DELETE FROM rag_table_rows  WHERE table_id = ?", [table_id])
+            con.execute("DELETE FROM rag_table_cols  WHERE table_id = ?", [table_id])
+            con.execute("DELETE FROM rag_tables      WHERE table_id = ?", [table_id])
+
+            # ---------- (3) rag_tables ----------
+            con.execute(
+                """
+                INSERT INTO rag_tables
+                (table_id, section_id, statement_type, unit_label, unit_multiplier, currency,
+                 raw_table_html, table_title, table_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    table_id, section_id, "NOTE",
+                    unit_label, unit_mult, currency,
+                    parsed["raw_table_html"], table_title, int(table_order)
+                )
+            )
+
+            if LOG_TABLE_DETAIL:
+                print(
+                    f"[DBG] NOTE upserting table_id={table_id} order={table_order} "
+                    f"(cols={len(parsed.get('col_headers') or [])}, "
+                    f"rows={len(parsed.get('rows') or [])}, "
+                    f"cells={len(parsed.get('cells') or [])})"
                 )
 
-                parts.append(f" [[TABLE:{table_id}]] ")
-                table_order += 1
+            # ---------- (4) columns ----------
+            col_rows = [
+                (table_id, col_idx, "note_col", header or "", None, None)
+                for col_idx, header in enumerate(parsed["col_headers"])
+            ]
+            if col_rows:
+                t_col = time.perf_counter()
+                for batch in _batched(col_rows, BATCH):
+                    con.executemany(
+                        """
+                        INSERT INTO rag_table_cols
+                        (table_id, col_idx, col_type, header_ko, period_end, fiscal_year)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        batch,
+                    )
+                if LOG_SQL_BATCH:
+                    print(f"[TIME] note table cols ({len(col_rows)}): {time.perf_counter() - t_col:.2f}s")
+
+            # ---------- (5) rows ----------
+            row_rows = [
+                (
+                    table_id,
+                    r["row_idx"],
+                    r["label_ko"],
+                    r["label_clean"],
+                    int(r.get("indent_level") or 0),
+                    r.get("parent_row_idx"),
+                    bool(r.get("is_abstract")),
+                    r.get("ifrs_code"),
+                    r.get("note_refs_raw"),
+                    r.get("note_nos") or [],
+                )
+                for r in parsed["rows"]
+            ]
+            if row_rows:
+                t_row = time.perf_counter()
+                for batch in _batched(row_rows, BATCH):
+                    con.executemany(
+                        """
+                        INSERT INTO rag_table_rows
+                        (table_id, row_idx, label_ko, label_clean, indent_level, parent_row_idx,
+                         is_abstract, ifrs_code, note_refs_raw, note_nos)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        batch,
+                    )
+                if LOG_SQL_BATCH:
+                    print(f"[TIME] note table rows ({len(row_rows)}): {time.perf_counter() - t_row:.2f}s")
+
+            # ---------- (6) cells (🔥 최대 병목 구간) ----------
+            t_build0 = time.perf_counter()
+            cell_rows = [
+                (table_id, ri, ci, tv, nv, dec, actx)
+                for (ri, ci, tv, nv, dec, actx) in parsed["cells"]
+            ]
+            if LOG_TABLE_DETAIL:
+                print(f"[TIME] build note cell_rows ({len(cell_rows)}): {time.perf_counter() - t_build0:.2f}s")
+
+            if cell_rows:
+                t_cell = time.perf_counter()
+                total = len(cell_rows)
+                done = 0
+                batch_no = 0
+
+                for batch in _batched(cell_rows, BATCH):
+                    con.executemany(
+                        """
+                        INSERT INTO rag_table_cells
+                        (table_id, row_idx, col_idx, text_value, num_value, decimals, acontext)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        batch,
+                    )
+                    done += len(batch)
+                    batch_no += 1
+
+                    if batch_no % PROGRESS_EVERY == 0:
+                        print(
+                            f"[PROG] note cells inserted {done:,}/{total:,} "
+                            f"({done/total*100:.1f}%) "
+                            f"elapsed={time.perf_counter() - t_cell:.1f}s"
+                        )
+
+                if LOG_SQL_BATCH:
+                    print(f"[TIME] note table cells ({total}): {time.perf_counter() - t_cell:.2f}s")
+
+            parts.append(f" [[TABLE:{table_id}]] ")
+            table_order += 1
             continue
 
+        # ---------- 일반 텍스트 ----------
         if isinstance(node, str):
             parent = getattr(node, "parent", None)
-            if parent and getattr(parent, "name", None) and parent.name.lower() in ("table", "thead", "tbody", "tr", "td", "th", "te"):
+            if parent and getattr(parent, "name", None) and parent.name.lower() in (
+                "table", "thead", "tbody", "tr", "td", "th", "te"
+            ):
                 continue
             txt = _norm_cell_text(node)
             if txt:
                 parts.append(txt + " ")
 
+    print(
+        f"[TIME] parse + upsert note tables TOTAL: {time.perf_counter() - t0:.2f}s "
+        f"(note_no={note_no}, section={section_code}, "
+        f"tables_seen={n_tables_seen}, tables_saved={table_order})"
+    )
+
+    # ---------- (7) 텍스트 chunk ----------
     flow_text = normalize_space("".join(parts)).strip()
     if not flow_text:
         return
@@ -844,8 +1017,13 @@ def upsert_notes_tables_and_text(
         chunk_overlap=chunk_overlap,
     )
 
-# ========== Notes sections + note_links ==========
+
+
+# ============================
+# Notes sections + note_links
+# ============================
 _NOTE_TITLE_NO_RE = re.compile(r"^\s*(\d+)\.\s*", re.I)
+
 
 def extract_note_no_from_title(title: str) -> Optional[int]:
     if not title:
@@ -853,7 +1031,8 @@ def extract_note_no_from_title(title: str) -> Optional[int]:
     m = _NOTE_TITLE_NO_RE.match(title.strip())
     return int(m.group(1)) if m else None
 
-def save_notes_sections(con, report_id: str, notes_sections: List[Tuple[str,str]]):
+
+def save_notes_sections(con, report_id: str, notes_sections: List[Tuple[str, str]]):
     for i, (title, html) in enumerate(notes_sections):
         note_no = extract_note_no_from_title(title)
         title_clean = clean_title_ko(title)
@@ -866,6 +1045,7 @@ def save_notes_sections(con, report_id: str, notes_sections: List[Tuple[str,str]
           (section_id, report_id, section_code, section_type, note_no, title_ko, title_en, sort_order, raw_html)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (section_id, report_id, section_code, "notes", note_no, title_clean, None, 3000 + i, html))
+
 
 def build_note_links(con: duckdb.DuckDBPyConnection, report_id: str):
     note_rows = con.execute("""
@@ -923,7 +1103,10 @@ def build_note_links(con: duckdb.DuckDBPyConnection, report_id: str):
             inserts
         )
 
-# ========== Meta 조회 helpers (market_data/benchmark_map) ==========
+
+# ============================
+# Meta 조회 helpers (market_data/benchmark_map)
+# ============================
 def get_target_meta_from_db(con: duckdb.DuckDBPyConnection, company_name_kr: str, year: int) -> dict:
     rows = con.execute("""
       SELECT
@@ -980,6 +1163,7 @@ def get_target_meta_from_db(con: duckdb.DuckDBPyConnection, company_name_kr: str
         "scale": str(scale) if scale is not None else None,
     }
 
+
 def get_benchmark_company_name_from_db(con: duckdb.DuckDBPyConnection, target_corp_code8: str, year: int) -> str | None:
     r = con.execute("""
       SELECT bench_corp_code, benchmark_name_kr
@@ -1020,7 +1204,10 @@ def get_benchmark_company_name_from_db(con: duckdb.DuckDBPyConnection, target_co
 
     return str(r3[0]).strip() if (r3 and r3[0]) else None
 
-# ========== ingest transaction ==========
+
+# ============================
+# ingest transaction
+# ============================
 def ingest_one_report_xml(
     xml_text: str,
     con: duckdb.DuckDBPyConnection,
@@ -1033,8 +1220,14 @@ def ingest_one_report_xml(
 ) -> str:
     init_db(con)
     ensure_table_schema(con)
+    
+    con.execute("PRAGMA threads=4")
+    con.execute("PRAGMA memory_limit='8GB'")
 
     report_id = stable_id(corp_code, str(bsns_year), rcept_no)
+
+    # ✅ 전체 타이머
+    t_all0 = time.perf_counter()
 
     try:
         con.execute("BEGIN TRANSACTION")
@@ -1045,9 +1238,14 @@ def ingest_one_report_xml(
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (report_id, corp_code, corp_name, bsns_year, rcept_no, None, None))
 
-        # I/II (biz)
+        # ✅ I/II 추출
+        t0 = time.perf_counter()
         biz = extract_biz_sections_from_xml(xml_text)
+        print(f"[TIME] extract biz sections: {time.perf_counter() - t0:.2f}s "
+              f"(I={len(biz.get('I', []))}, II={len(biz.get('II', []))})")
 
+        # ✅ I 업서트
+        t1 = time.perf_counter()
         for i, (title, html) in enumerate(biz.get("I", [])):
             m = re.match(r"^\s*(\d+)\.\s*", title or "")
             n = m.group(1) if m else None
@@ -1065,6 +1263,10 @@ def ingest_one_report_xml(
 
             upsert_text_chunks(con, report_id, section_id, section_code, "biz", note_no, html, chunk_size, chunk_overlap)
 
+        print(f"[TIME] upsert I(biz) sections+chunks: {time.perf_counter() - t1:.2f}s")
+
+        # ✅ II 업서트
+        t2 = time.perf_counter()
         for i, (title, html) in enumerate(biz.get("II", [])):
             m = re.match(r"^\s*(\d+)\.\s*", title or "")
             n = m.group(1) if m else None
@@ -1082,12 +1284,18 @@ def ingest_one_report_xml(
 
             upsert_text_chunks(con, report_id, section_id, section_code, "biz", note_no, html, chunk_size, chunk_overlap)
 
-        # III (fin)
+        print(f"[TIME] upsert II(biz) sections+chunks: {time.perf_counter() - t2:.2f}s")
+
+        # ✅ III(fin) 추출
+        t3 = time.perf_counter()
         fin = extract_financial_sections_from_xml(xml_text)
         fs_sections = fin.get("fs", [])
         notes_sections = fin.get("notes", [])
+        print(f"[TIME] extract financial sections: {time.perf_counter() - t3:.2f}s "
+              f"(fs={len(fs_sections)}, notes={len(notes_sections)})")
 
-        # III-2 FS tables
+        # ✅ III-2 FS tables
+        t4 = time.perf_counter()
         for i, (title, html) in enumerate(fs_sections):
             title_clean = clean_title_ko(title)
             section_code0 = (title.split()[0].replace(".", "") if title else f"X{i}")
@@ -1109,16 +1317,25 @@ def ingest_one_report_xml(
                 table_parser="fin",
             )
 
-        # III-3 Notes
-        save_notes_sections(con, report_id, notes_sections)
+        print(f"[TIME] upsert III-2(fs) sections+tables: {time.perf_counter() - t4:.2f}s")
 
+        # ✅ notes 섹션 저장
+        t5 = time.perf_counter()
+        save_notes_sections(con, report_id, notes_sections)
+        print(f"[TIME] save notes sections: {time.perf_counter() - t5:.2f}s")
+
+        # ✅ notes rows fetch
+        t6 = time.perf_counter()
         note_rows = con.execute("""
           SELECT section_id, section_code, note_no, title_ko, raw_html
           FROM report_sections
           WHERE report_id=? AND section_type='notes'
           ORDER BY sort_order
         """, [report_id]).fetchall()
+        print(f"[TIME] fetch note_rows: {time.perf_counter() - t6:.2f}s (n={len(note_rows)})")
 
+        # ✅ notes tables + text
+        t7 = time.perf_counter()
         for (sid, scode, note_no, title_ko, raw_html) in note_rows:
             upsert_notes_tables_and_text(
                 con=con,
@@ -1131,20 +1348,31 @@ def ingest_one_report_xml(
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
             )
+        print(f"[TIME] upsert III-3(notes) tables+chunks: {time.perf_counter() - t7:.2f}s")
 
+        # ✅ note_links
+        t8 = time.perf_counter()
         build_note_links(con, report_id)
+        print(f"[TIME] build_note_links: {time.perf_counter() - t8:.2f}s")
 
         con.execute("COMMIT")
+
+        print(f"[TIME] ingest_one_report_xml TOTAL: {time.perf_counter() - t_all0:.2f}s "
+              f"(report_id={report_id})")
+
         return report_id
 
-    except Exception:
+    except BaseException:
         try:
             con.execute("ROLLBACK")
         except Exception:
             pass
         raise
 
-# ========== delete helper ==========
+
+# ============================
+# delete helper
+# ============================
 def delete_report(con: duckdb.DuckDBPyConnection, report_id: str):
     if not _table_exists(con, "reports"):
         return
@@ -1169,10 +1397,11 @@ def delete_report(con: duckdb.DuckDBPyConnection, report_id: str):
         con.execute("DELETE FROM rag_text_embeddings WHERE chunk_id IN (SELECT UNNEST(?))", [chunk_ids])
         con.execute("DELETE FROM rag_text_chunks     WHERE chunk_id IN (SELECT UNNEST(?))", [chunk_ids])
 
-    con.execute("DELETE FROM fs_facts       WHERE report_id = ?", [report_id])
-    con.execute("DELETE FROM note_links     WHERE report_id = ?", [report_id])
+    con.execute("DELETE FROM fs_facts        WHERE report_id = ?", [report_id])
+    con.execute("DELETE FROM note_links      WHERE report_id = ?", [report_id])
     con.execute("DELETE FROM report_sections WHERE report_id = ?", [report_id])
-    con.execute("DELETE FROM reports        WHERE report_id = ?", [report_id])
+    con.execute("DELETE FROM reports         WHERE report_id = ?", [report_id])
+
 
 # =============================
 # (APPEND) Pipeline helpers from notebook
@@ -1188,6 +1417,7 @@ from .utils.dart import (
     pick_xml_with_iii,
     find_business_report_rcept_no_odr,
 )
+
 
 def ingest_company_year(
     corp_name: str,
@@ -1214,6 +1444,10 @@ def ingest_company_year(
         raise RuntimeError("DART_API_KEY가 비어있습니다. .env 또는 --dart-key로 설정하세요.")
 
     con = duckdb.connect(db_path)
+    
+    con.execute("PRAGMA threads=4")
+    con.execute("PRAGMA memory_limit='8GB'")
+    
     init_db(con)
     ensure_table_schema(con)
 
@@ -1221,7 +1455,6 @@ def ingest_company_year(
     corp_code = meta["corp_code"]
     rcept_date = int(meta["asof_date"])
 
-    # OpenDartReader list로 rcept_no 찾기 (노트북 로직 동일)
     import OpenDartReader
     dart = OpenDartReader(dart_api_key)
 
