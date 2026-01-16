@@ -1371,7 +1371,7 @@ def ingest_one_report_xml(
 
 
 # ============================
-# delete helper
+# delete helper : 해당 report_id와 관련된 모든 데이터 완전 삭제
 # ============================
 def delete_report(con: duckdb.DuckDBPyConnection, report_id: str):
     if not _table_exists(con, "reports"):
@@ -1430,14 +1430,12 @@ def ingest_company_year(
     skip_if_exists: bool = True,
 ) -> str:
     """
-    네 cli.py가 import 하는 이름/시그니처에 맞춤:
-      ingest_company_year(corp_name, bsns_year, db_path, cache_dir, dart_api_key)
+    ingest_company_year(corp_name, bsns_year, db_path, cache_dir, dart_api_key)
 
-    내부 흐름은 노트북 pipeline 그대로:
-      market_data에서 corp_code/asof_date 가져오기
-      OpenDartReader로 rcept_no 찾기
-      document.xml fetch -> pick_xml_with_iii
-      ingest_one_report_xml 실행
+    market_data에서 corp_code/asof_date 가져오기
+    OpenDartReader로 rcept_no 찾기
+    document.xml fetch -> pick_xml_with_iii
+    ingest_one_report_xml 실행
     """
     dart_api_key = (dart_api_key or "").strip()
     if not dart_api_key:
@@ -1468,7 +1466,8 @@ def ingest_company_year(
     )
 
     report_id = stable_id(corp_code, str(int(bsns_year)), str(rcept_no))
-
+ 
+    # DB의 reports 테이블에 같은 report_id가 이미 있으면 아무 것도 안 하고 바로 return. ingest 전 과정 스킵
     if skip_if_exists:
         exists = con.execute("SELECT 1 FROM reports WHERE report_id=?", [report_id]).fetchone()
         if exists:
