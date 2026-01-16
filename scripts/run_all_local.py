@@ -13,12 +13,57 @@ def spec_id_of(section_dir: Path) -> str:
     return spec["id"]
 
 def main():
-    # workdir, client, system_rules 준비는 기존 run_all_local.py 그대로 사용
 
     # 1) Phase1 (1~8) - 병렬
+        # 1) Phase1 (1~8) - 병렬
     phase1_dirs = [
-        # TODO: 너희 실제 섹션 폴더들로 채우기 (1~8 전체)
+        # --- c01_intro ---
+        SECTIONS_ROOT / "c01_intro" / "s01_1_objective",
+        SECTIONS_ROOT / "c01_intro" / "s01_2_company_overview",
+        SECTIONS_ROOT / "c01_intro" / "s01_3_data_scope",
+
+        # --- c02_bs ---
+        SECTIONS_ROOT / "c02_bs" / "s02_1_assets",
+        SECTIONS_ROOT / "c02_bs" / "s02_2_liabilities",
+        SECTIONS_ROOT / "c02_bs" / "s02_3_equity",
+        SECTIONS_ROOT / "c02_bs" / "s02_4_financial_health",
+
+        # --- c03_is ---
+        SECTIONS_ROOT / "c03_is" / "s03_1_rev_cost",
+        SECTIONS_ROOT / "c03_is" / "s03_2_profit_flow",
+        SECTIONS_ROOT / "c03_is" / "s03_3_profitability_summary",
+
+        # --- c04_cf ---
+        SECTIONS_ROOT / "c04_cf" / "s04_1_ocf",
+        SECTIONS_ROOT / "c04_cf" / "s04_2_icf",
+        SECTIONS_ROOT / "c04_cf" / "s04_3_fff",
+
+        # --- c05_liquidity ---
+        SECTIONS_ROOT / "c05_liquidity" / "s05_1_current_ratio",
+        SECTIONS_ROOT / "c05_liquidity" / "s05_2_quick_ratio",
+        SECTIONS_ROOT / "c05_liquidity" / "s05_3_cash_ratio",
+        SECTIONS_ROOT / "c05_liquidity" / "s05_4_liquidity_summary",
+
+        # --- c06_leverage_stability ---
+        SECTIONS_ROOT / "c06_leverage_stability" / "s06_1_total_debt_ratio",
+        SECTIONS_ROOT / "c06_leverage_stability" / "s06_2_long_term_debt_ratio",
+        SECTIONS_ROOT / "c06_leverage_stability" / "s06_3_interest_coverage",
+        SECTIONS_ROOT / "c06_leverage_stability" / "s06_4_cash_coverage_ocf",
+        SECTIONS_ROOT / "c06_leverage_stability" / "s06_5_stability_summary",
+
+        # --- c07_profitability_dupont ---
+        SECTIONS_ROOT / "c07_profitability_dupont" / "s07_1_turnover",
+        SECTIONS_ROOT / "c07_profitability_dupont" / "s07_2_roa_roe_roc",
+        SECTIONS_ROOT / "c07_profitability_dupont" / "s07_3_dupont",
+        SECTIONS_ROOT / "c07_profitability_dupont" / "s07_4_market_ratios",
+        SECTIONS_ROOT / "c07_profitability_dupont" / "s07_5_ch7_summary",
+
+        # --- c08_activity_pros_cons ---
+        SECTIONS_ROOT / "c08_activity_pros_cons" / "s08_1_operating",
+        SECTIONS_ROOT / "c08_activity_pros_cons" / "s08_2_investing",
+        SECTIONS_ROOT / "c08_activity_pros_cons" / "s08_3_financing",
     ]
+
     phase1_spec_ids = [spec_id_of(d) for d in phase1_dirs]
 
     asyncio.run(run_sections_parallel(
@@ -51,7 +96,7 @@ def main():
     phase3_dirs = [
         SECTIONS_ROOT / "c10_conclusion" / "s10_1_strength_summary",
         SECTIONS_ROOT / "c10_conclusion" / "s10_2_risk_summary",
-        SECTIONS_ROOT / "c10_conclusion" / "s10_3_implications_limits",
+        SECTIONS_ROOT / "c10_conclusion" / "s10_3_implication_and_limits",
     ]
     for d in phase3_dirs:
         run_section(workdir, d, client, system_rules, OUT_SECTIONS_DIR)
