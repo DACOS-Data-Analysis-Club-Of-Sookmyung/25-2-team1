@@ -15,7 +15,6 @@ def spec_id_of(section_dir: Path) -> str:
 def main():
 
     # 1) Phase1 (1~8) - 병렬
-        # 1) Phase1 (1~8) - 병렬
     phase1_dirs = [
         # --- c01_intro ---
         SECTIONS_ROOT / "c01_intro" / "s01_1_objective",

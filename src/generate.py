@@ -1,18 +1,15 @@
-# src/generate.py
 from __future__ import annotations
 
 import asyncio
 import importlib
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.llm.client import OpenAICompatClient
 
 
-# --------
 # helpers
-# --------
 def read_text(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
@@ -26,9 +23,7 @@ def render_prompt(prompt_md: str, ctx: Dict[str, Any]) -> str:
     return prompt_md.format(**ctx)
 
 
-# --------
 # core
-# --------
 def run_section(
     workdir: Path,
     section_dir: Path,
@@ -99,36 +94,64 @@ async def run_sections_parallel(
     return await asyncio.gather(*tasks)
 
 
+def _parse_chapter_no(section_id: Optional[str]) -> Optional[int]:
+    """section_id가 '3.2' 같은 형태라고 가정하고 장 번호(3)만 추출."""
+    if not section_id:
+        return None
+    try:
+        return int(str(section_id).split(".", 1)[0])
+    except Exception:
+        return None
+
+
 def make_bridge_summary(
     client: OpenAICompatClient,
     out_dir: Path,
     workdir: Path,
     phase1_spec_ids: List[str],
+    chapter_groups: List[Tuple[int, ...]] = [(1, 2), (3, 4, 5), (6, 7, 8)],
     max_chars_per_section: int = 1200,
+    max_tokens: int = 1200,
 ) -> Path:
     """
-    1~8 섹션 결과(out_dir/<spec_id>.json)를 읽어 bridge_summary.json 생성
-    - 모델 출력은 JSON만 요구
+    - 섹션 결과(out_dir/<spec_id>.json)를 읽어온 뒤
+    - (1,2) / (3,4,5) / (6,7,8) 세 그룹으로 나눠 LLM을 3번 호출
+    - 저장은 bridge_summary.json 하나에 '장별(chapters)' 구조로 저장
     """
+
+    # 0) 섹션 결과 수집
     items: List[Dict[str, Any]] = []
     for sid in phase1_spec_ids:
         fp = out_dir / f"{sid}.json"
         if not fp.exists():
             continue
         obj = read_json(fp)
+
+        section_id = obj.get("section_id")
+        chapter_no = _parse_chapter_no(section_id)
+        if chapter_no is None:
+            # 장 번호 파싱 불가한 섹션은 제외(원하면 raise로 바꿔도 됨)
+            continue
+
         content = (obj.get("content") or "").strip().replace("\n\n", "\n")
         if len(content) > max_chars_per_section:
             content = content[:max_chars_per_section] + "…"
+
         items.append(
             {
-                "section_id": obj.get("section_id"),
+                "chapter_no": chapter_no,
+                "section_id": section_id,
                 "title": obj.get("title"),
                 "content": content,
             }
         )
+
     if not items:
         raise RuntimeError("Bridge 입력 섹션 결과가 비어있습니다. phase1 실행/출력 경로를 확인하세요.")
 
+    items.sort(key=lambda x: (x["chapter_no"], str(x["section_id"])))
+
+    # 1) LLM 호출(그룹 단위)
     system = (
         "너는 보고서 섹션 요약기다. "
         "각 섹션의 핵심 결론을 1~2문장으로 요약한다. "
@@ -136,23 +159,71 @@ def make_bridge_summary(
         "출력은 반드시 JSON만."
     )
 
-    user = (
-        "아래는 보고서 1~8장 섹션별 생성 결과다.\n"
-        "각 항목마다 1~2문장 요약을 만들어라.\n\n"
-        "출력 JSON 스키마:\n"
-        "{\n"
-        '  "section_summaries": {"<section_id>": "<요약>", ...},\n'
-        '  "bridge_text": "[BRIDGE SUMMARY]\\n- <section_id> <title>: ...\\n..."\n'
-        "}\n\n"
-        "입력:\n"
-        f"{json.dumps(items, ensure_ascii=False, indent=2)}"
-    )
+    def _call_group(group_items: List[Dict[str, Any]], label: str) -> Dict[str, Any]:
+        user = (
+            "아래는 보고서 섹션별 생성 결과다.\n"
+            "각 항목마다 1~2문장 요약을 만들어라.\n\n"
+            "출력 JSON 스키마:\n"
+            "{\n"
+            '  "section_summaries": {"<section_id>": "<요약>", ...},\n'
+            '  "group_text": "[GROUP SUMMARY]\\n- <section_id> <title>: ...\\n..."\n'
+            "}\n\n"
+            "입력:\n"
+            f"{json.dumps(group_items, ensure_ascii=False, indent=2)}"
+        )
+        raw = client.chat(system=system, user=user, temperature=0.2, max_tokens=max_tokens)
+        return json.loads(raw)
 
-    raw = client.chat(system=system, user=user, temperature=0.2, max_tokens=1200)
-
-    # JSON only를 강제했지만, 혹시 모델이 실수하면 여기서 터짐 -> 그게 오히려 빨리 원인 파악 가능
-    bridge_obj = json.loads(raw)
-
+    # 2) 저장 객체 준비(기존 파일 있으면 이어쓰기)
     out_path = workdir / "bridge_summary.json"
+    if out_path.exists():
+        try:
+            bridge_obj = json.loads(out_path.read_text(encoding="utf-8"))
+        except Exception:
+            bridge_obj = {}
+    else:
+        bridge_obj = {}
+
+    if "chapters" not in bridge_obj or not isinstance(bridge_obj["chapters"], dict):
+        bridge_obj["chapters"] = {}
+
+    # 3) 그룹별 호출 → 결과를 '장별'로 분배하여 저장
+    for group in chapter_groups:
+        group_set = set(group)
+        group_items = [it for it in items if it["chapter_no"] in group_set]
+        if not group_items:
+            continue
+
+        label = f"{min(group)}-{max(group)}" if len(group) > 1 else str(group[0])
+        group_result = _call_group(group_items, label=label)
+
+        section_summaries: Dict[str, str] = group_result.get("section_summaries", {}) or {}
+
+        # 3-1) 섹션 요약을 장별로 나눠 담기
+        by_chapter: Dict[int, Dict[str, str]] = {}
+        for sec_id, summ in section_summaries.items():
+            ch = _parse_chapter_no(sec_id)
+            if ch is None:
+                continue
+            by_chapter.setdefault(ch, {})[sec_id] = summ
+
+        # 3-2) 장별 chapter_text도 만들어 저장
+        for ch, sec_map in by_chapter.items():
+            ch_key = str(ch)
+            if ch_key not in bridge_obj["chapters"]:
+                bridge_obj["chapters"][ch_key] = {"section_summaries": {}, "chapter_text": ""}
+
+            # 섹션 요약 merge
+            bridge_obj["chapters"][ch_key]["section_summaries"].update(sec_map)
+
+            # chapter_text 재생성(해당 장의 섹션만)
+            lines = [f"[CHAPTER SUMMARY {ch}]"]
+            # 섹션 순서대로 출력
+            for sec_id in sorted(sec_map.keys(), key=lambda x: [int(p) if p.isdigit() else p for p in str(x).split(".")]):
+                title = next((it["title"] for it in group_items if it["section_id"] == sec_id), "")
+                lines.append(f"- {sec_id} {title}: {sec_map[sec_id]}")
+            bridge_obj["chapters"][ch_key]["chapter_text"] = "\n".join(lines)
+
+    # 4) 저장
     out_path.write_text(json.dumps(bridge_obj, ensure_ascii=False, indent=2), encoding="utf-8")
     return out_path
