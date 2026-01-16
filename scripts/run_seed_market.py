@@ -21,7 +21,7 @@ def main():
     args = p.parse_args()
 
     db_path = Path(os.environ.get("DB_PATH", str(ROOT / "data" / "duckdb" / "dart.duckdb")))
-    csv_path = Path(os.environ.get("CSV_PATH", str(ROOT / "data" / "company_meta.csv")))
+    csv_path = Path(os.environ.get("CSV_PATH", str(ROOT / "data" / "benchmark_results.csv")))
 
     if not csv_path.exists():
         raise FileNotFoundError(f"CSV not found: {csv_path}")
