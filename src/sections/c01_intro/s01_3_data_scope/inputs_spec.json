@@ -1,0 +1,12 @@
+{
+  "id": "c01.s01_3",
+  "section_id": "1.3",
+  "title": "분석 자료 및 범위",
+  "prompt": "prompt.md",
+  "llm": {
+    "temperature": 0.2,
+    "max_tokens": 900
+  },
+  "metrics_path": "metrics/metrics_S01_3.json",
+  "evidence_path": "evidence/evidence_S01_3.json"
+}

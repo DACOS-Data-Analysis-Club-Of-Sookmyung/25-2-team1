@@ -1,0 +1,9 @@
+{
+  "id": "c04.s04_2",
+  "section_id": "4.2",
+  "title": "투자활동 현금흐름",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1500 },
+  "metrics_path": "metrics/metrics_S04_2.json",
+  "evidence_path": "evidence/evidence_S04_2.json"
+}

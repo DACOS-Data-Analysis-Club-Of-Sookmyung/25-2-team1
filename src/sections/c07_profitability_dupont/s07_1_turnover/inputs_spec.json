@@ -1,0 +1,9 @@
+{
+  "id": "c07.s07_1",
+  "section_id": "7.1",
+  "title": "자산·재고·매출채권 회전율",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1700 },
+  "metrics_path": "metrics/metrics_S07_1.json",
+  "evidence_path": "evidence/evidence_S07_1.json"
+}

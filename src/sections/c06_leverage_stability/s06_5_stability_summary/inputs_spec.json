@@ -1,0 +1,9 @@
+{
+  "id": "c06.s06_5",
+  "section_id": "6.5",
+  "title": "재무 안정성 종합 평가",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1800 },
+  "metrics_path": "metrics/metrics_S06_5.json",
+  "evidence_path": "evidence/evidence_S06_5.json"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "c06.s06_2",
+  "section_id": "6.2",
+  "title": "장기부채비율",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1500 },
+  "metrics_path": "metrics/metrics_S06_2.json",
+  "evidence_path": "evidence/evidence_S06_2.json"
+}

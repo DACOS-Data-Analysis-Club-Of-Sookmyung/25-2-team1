@@ -1,0 +1,9 @@
+{
+  "id": "c07.s07_4",
+  "section_id": "7.4",
+  "title": "PER, PBR, PSR 분석",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1900 },
+  "metrics_path": "metrics/metrics_S07_4.json",
+  "evidence_path": "evidence/evidence_S07_4.json"
+}

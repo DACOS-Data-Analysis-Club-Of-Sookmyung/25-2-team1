@@ -1,0 +1,9 @@
+{
+  "id": "c10.s10_3",
+  "section_id": "10.3",
+  "title": "시사점 및 한계",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1600 },
+  "metrics_path": "metrics/metrics_S10_3.json",
+  "evidence_path": "evidence/evidence_S10_3.json"
+}
