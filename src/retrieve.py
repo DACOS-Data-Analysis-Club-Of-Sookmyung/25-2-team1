@@ -1,5 +1,9 @@
-# Notes 표 SQL 검색 + 컨텍스트 조립
 # src/retrieve.py
+# 질문에 필요한 ‘텍스트 설명 + 표 근거’를 모아서 하나의 컨텍스트로 만드는 단계
+# 1. 텍스트 검색 (FAISS) : 질문 → embedding  -> FAISS에서 top-k chunk_id 검색  
+# -> chunk_id로 DuckDB에서:원문 텍스트, section_code, note_no 등을 가져옴. 
+# 2. 주석 표 검색 (DuckDB SQL) : 입력: 사용자 질문 (키워드) -> “주석 12번 표에서 매출채권이 ○○로 구성됨” 같은 정량 근거
+
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 import duckdb

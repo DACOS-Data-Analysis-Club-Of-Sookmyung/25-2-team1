@@ -1,4 +1,11 @@
 # src/embed.py
+# DuckDB에 저장된 “텍스트 chunk”들을 벡터로 바꿔서 FAISS에 넣는 단계
+# ingest 단계에서 DuckDB에 rag_text_chunks에 III-2 / III-3에서 추출한 설명 텍스트가 저장됨.
+# 1. rag_text_chunks.text_for_embed 컬럼 읽기
+# 2. SentenceTransformer 같은 모델로 embedding
+# 3. chunk_id → vec_id(int64)로 변환
+# 4. FAISS index에 (vec_id, embedding) 저장
+
 from __future__ import annotations
 
 import os
@@ -8,17 +15,11 @@ import duckdb
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
-
+from src.utils.ids import chunk_id_to_int64
 
 def _get_existing_cols(con: duckdb.DuckDBPyConnection, table: str) -> list[str]:
     rows = con.execute(f"PRAGMA table_info('{table}')").fetchall()
     return [r[1] for r in rows]
-
-
-def chunk_id_to_int64(chunk_id_hex40: str) -> int:
-    # 노트북에서 쓰던 방식과 동일(앞 16hex를 int64로)
-    return int(chunk_id_hex40[:16], 16) - (1 << 63)
-
 
 def load_or_create_faiss(index_path: str, dim: int) -> faiss.Index:
     if os.path.exists(index_path):
@@ -35,9 +36,6 @@ def normalize_embeddings(x: np.ndarray) -> np.ndarray:
     return x / norms
 
 
-# ============================================================
-# ✅ pipeline.py가 기대하는 함수 (con을 받아서 같은 커넥션으로 처리)
-# ============================================================
 def build_or_update_faiss_from_db(
     con: duckdb.DuckDBPyConnection,
     index_path: str,
