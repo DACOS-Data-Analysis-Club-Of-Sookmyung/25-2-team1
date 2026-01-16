@@ -1,0 +1,7 @@
+{
+  "id": "c08.s08_1",
+  "section_id": "8.1",
+  "title": "영업활동 장·단점",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1700 }
+}

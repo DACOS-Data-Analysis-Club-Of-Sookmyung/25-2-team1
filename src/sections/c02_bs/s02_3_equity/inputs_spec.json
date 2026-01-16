@@ -1,0 +1,7 @@
+{
+  "id": "c02.s02_3",
+  "section_id": "2.3",
+  "title": "자기자본 구조 및 변동",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1200 }
+}

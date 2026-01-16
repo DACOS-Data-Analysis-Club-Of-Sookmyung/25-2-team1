@@ -1,0 +1,7 @@
+{
+  "id": "c03.s03_1",
+  "section_id": "3.1",
+  "title": "매출 및 비용 구조",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1400 }
+}

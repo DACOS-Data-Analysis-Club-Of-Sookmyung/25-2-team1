@@ -1,0 +1,7 @@
+{
+  "id": "c07.s07_5",
+  "section_id": "7.5",
+  "title": "수익성 구조에 대한 종합 해석",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 2000 }
+}

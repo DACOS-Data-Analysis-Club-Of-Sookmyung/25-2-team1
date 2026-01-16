@@ -1,0 +1,7 @@
+{
+  "id": "c05.s05_3",
+  "section_id": "5.3",
+  "title": "현금비율",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1500 }
+}

@@ -1,0 +1,7 @@
+{
+  "id": "c09.s09_3",
+  "section_id": "9.3",
+  "title": "Opportunity",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1600 }
+}

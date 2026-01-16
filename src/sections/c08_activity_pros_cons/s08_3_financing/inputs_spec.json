@@ -1,0 +1,7 @@
+{
+  "id": "c08.s08_3",
+  "section_id": "8.3",
+  "title": "재무활동 장·단점",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1700 }
+}

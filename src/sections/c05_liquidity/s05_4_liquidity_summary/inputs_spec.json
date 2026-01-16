@@ -1,0 +1,7 @@
+{
+  "id": "c05.s05_4",
+  "section_id": "5.4",
+  "title": "유동성에 대한 종합 평가",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1700 }
+}

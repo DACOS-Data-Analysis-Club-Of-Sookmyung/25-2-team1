@@ -1,0 +1,7 @@
+{
+  "id": "c09.s09_2",
+  "section_id": "9.2",
+  "title": "Weakness",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1400 }
+}

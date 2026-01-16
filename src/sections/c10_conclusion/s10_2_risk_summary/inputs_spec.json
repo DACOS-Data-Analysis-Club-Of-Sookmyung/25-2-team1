@@ -1,0 +1,7 @@
+{
+  "id": "c10.s10_2",
+  "section_id": "10.2",
+  "title": "재무적 리스크 요약",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1500 }
+}

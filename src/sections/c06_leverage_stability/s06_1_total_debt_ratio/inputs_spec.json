@@ -1,0 +1,7 @@
+{
+  "id": "c06.s06_1",
+  "section_id": "6.1",
+  "title": "총부채비율",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1500 }
+}

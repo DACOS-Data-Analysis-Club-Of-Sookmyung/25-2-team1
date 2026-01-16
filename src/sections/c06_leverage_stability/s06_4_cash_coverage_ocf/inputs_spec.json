@@ -1,0 +1,7 @@
+{
+  "id": "c06.s06_4",
+  "section_id": "6.4",
+  "title": "현금보상비율",
+  "prompt": "prompt.md",
+  "llm": { "temperature": 0.2, "max_tokens": 1600 }
+}
