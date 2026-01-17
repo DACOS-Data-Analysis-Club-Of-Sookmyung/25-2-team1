@@ -8,5 +8,7 @@
     "max_tokens": 900
   },
   "metrics_path": "metrics/metrics_S01_2.json",
-  "evidence_path": "evidence/evidence_S01_2.json"
+  "evidence_path": "evidence/evidence_S01_2.json",
+  "evidence_spec": [{"type": "biz"}],
+  "metrics_spec": []
 }
