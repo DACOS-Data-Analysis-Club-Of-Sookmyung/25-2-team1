@@ -166,10 +166,19 @@ async def run_sections_parallel(
         loop = asyncio.get_running_loop()
         tasks = [
             loop.run_in_executor(
-                None, run_section, workdir, sdir, client, system_rules, out_dir, False
+                None,
+                lambda sd=sdir: run_section(
+                    workdir=workdir,
+                    section_dir=sd,
+                    client=client,
+                    system_rules=system_rules,
+                    out_dir=out_dir,
+                    build_inputs=False,   # 이미 inputs 준비했으니까
+                ),
             )
             for sdir in section_dirs
         ]
+
         return await asyncio.gather(*tasks)
 
     # inputs 생성까지 섹션별로 통째 병렬(비권장 옵션)
