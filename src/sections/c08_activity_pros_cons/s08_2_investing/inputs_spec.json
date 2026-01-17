@@ -1,9 +1,12 @@
 {
   "id": "c08.s08_2",
   "section_id": "8.2",
-  "title": "투자활동 장·단점",
+  "title": "투자활동",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1700 },
-  "metrics_path": "metrics/metrics_S08_2.json",
-  "evidence_path": "evidence/evidence_S08_2.json"
+  "llm": {
+    "temperature": 0.2,
+    "max_tokens": 1000
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": ["PPE", "IA", "PURCHASE_PPE", "ICF"]
 }

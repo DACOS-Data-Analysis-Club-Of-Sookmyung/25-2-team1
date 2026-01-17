@@ -5,11 +5,7 @@ from typing import Dict, Any
 from src.sections._common.io import load_inputs, pack_evidence
 
 def build_ctx(workdir: Path, spec: Dict[str, Any]) -> Dict[str, Any]:
-    inputs = load_inputs(
-        workdir,
-        metrics_path=spec.get("metrics_path"),
-        evidence_path=spec.get("evidence_path"),
-    )
+    inputs = load_inputs(workdir, spec_id=spec["id"], allow_missing_evidence=True)
     meta = inputs["meta"]
     evidence_rows = inputs["evidence_rows"]
 

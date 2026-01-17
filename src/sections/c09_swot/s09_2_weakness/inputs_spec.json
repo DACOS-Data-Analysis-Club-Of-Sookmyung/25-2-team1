@@ -3,7 +3,8 @@
   "section_id": "9.2",
   "title": "Weakness",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1400 },
-  "metrics_path": "metrics/metrics_S09_2.json",
-  "evidence_path": "evidence/evidence_S09_2.json"
+  "llm": { "temperature": 0.2, "max_tokens": 900 },
+
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": []
 }

@@ -1,9 +1,21 @@
 {
-  "id": "c10.s10_3",
+  "id": "c10.s10_3_implication_and_limits",
   "section_id": "10.3",
   "title": "시사점 및 한계",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1600 },
-  "metrics_path": "metrics/metrics_S10_3.json",
-  "evidence_path": "evidence/evidence_S10_3.json"
+  "llm": {
+    "temperature": 0.3,
+    "max_tokens": 900
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": [
+    "REVENUE",
+    "OP_PROFIT",
+    "NET_INCOME",
+    "OCF",
+    "CASH_EQ",
+    "TOTAL_LIABILITIES",
+    "CURRENT_LIABILITIES",
+    "EQUITY"
+  ]
 }

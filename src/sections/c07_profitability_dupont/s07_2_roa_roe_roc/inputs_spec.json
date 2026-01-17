@@ -3,7 +3,19 @@
   "section_id": "7.2",
   "title": "ROA, ROE, ROC 분석",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1800 },
-  "metrics_path": "metrics/metrics_S07_2.json",
-  "evidence_path": "evidence/evidence_S07_2.json"
+  "llm": {
+    "temperature": 0.15,
+    "max_tokens": 900
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": [
+    "NET_INCOME",
+    "OP_PROFIT",
+    "TAX_EXP",
+    "TOTAL_ASSETS",
+    "EQUITY",
+    "roa",
+    "roe",
+    "roc"
+  ]
 }

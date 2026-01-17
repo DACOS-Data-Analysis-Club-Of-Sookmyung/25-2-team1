@@ -7,6 +7,6 @@
     "temperature": 0.2,
     "max_tokens": 400
   },
-  "metrics_path": "metrics/metrics_S01_1.json",
-  "evidence_path": "evidence/evidence_S01_1.json"
+  "metrics_path": [],
+  "evidence_path": []
 }

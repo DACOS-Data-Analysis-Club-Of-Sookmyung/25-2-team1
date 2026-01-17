@@ -1,9 +1,12 @@
 {
   "id": "c08.s08_1",
   "section_id": "8.1",
-  "title": "영업활동 장·단점",
+  "title": "영업활동",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1700 },
-  "metrics_path": "metrics/metrics_S08_1.json",
-  "evidence_path": "evidence/evidence_S08_1.json"
+  "llm": {
+    "temperature": 0.2,
+    "max_tokens": 1000
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": ["REVENUE", "COGS", "SGA_EXPENSES", "OP_PROFIT", "OCF"]
 }

@@ -1,9 +1,12 @@
 {
   "id": "c08.s08_3",
   "section_id": "8.3",
-  "title": "재무활동 장·단점",
+  "title": "재무활동",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1700 },
-  "metrics_path": "metrics/metrics_S08_3.json",
-  "evidence_path": "evidence/evidence_S08_3.json"
+  "llm": {
+    "temperature": 0.2,
+    "max_tokens": 1000
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": ["SHORT_TERM_DEBT", "LONG_TERM_DEBT", "FCF_FIN"]
 }

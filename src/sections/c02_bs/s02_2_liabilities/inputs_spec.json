@@ -3,7 +3,17 @@
   "section_id": "2.2",
   "title": "부채 구조 및 변동",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1200 },
-  "metrics_path": "metrics/metrics_S02_2.json",
-  "evidence_path": "evidence/evidence_S02_2.json"
+  "llm": {
+    "temperature": 0.15,
+    "max_tokens": 900
+  },
+  "evidence_spec": [],
+  "metrics_spec": [
+    "TOTAL_LIABILITIES",
+    "CURRENT_LIABILITIES",
+    "NON_CURRENT_LIABILITIES",
+    "AP",
+    "SHORT_TERM_DEBT",
+    "LONG_TERM_DEBT"
+  ]
 }

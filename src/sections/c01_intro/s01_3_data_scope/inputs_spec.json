@@ -4,9 +4,9 @@
   "title": "분석 자료 및 범위",
   "prompt": "prompt.md",
   "llm": {
-    "temperature": 0.2,
-    "max_tokens": 900
+    "temperature": 0.0,
+    "max_tokens": 500
   },
-  "metrics_path": "metrics/metrics_S01_3.json",
-  "evidence_path": "evidence/evidence_S01_3.json"
+  "metrics_path": [],
+  "evidence_path": []
 }

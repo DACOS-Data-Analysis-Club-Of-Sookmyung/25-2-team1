@@ -3,7 +3,10 @@
   "section_id": "5.1",
   "title": "유동비율",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1500 },
-  "metrics_path": "metrics/metrics_S05_1.json",
-  "evidence_path": "evidence/evidence_S05_1.json"
+  "llm": {
+    "temperature": 0.15,
+    "max_tokens": 900
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": ["CURRENT_ASSETS", "CURRENT_LIABILITIES", "current_ratio"]
 }
