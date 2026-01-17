@@ -18,7 +18,7 @@ load_dotenv()
 
 def _resolve_paths(root: Path):
     db_path = Path(os.environ.get("DB_PATH", str(root / "data" / "duckdb" / "dart.duckdb")))
-    csv_path = Path(os.environ.get("CSV_PATH", str(root / "data" / "company_meta.csv")))
+    csv_path = Path(os.environ.get("CSV_PATH", str(root / "data" / "benchmark_results.csv")))
     cache_dir = Path(os.environ.get("CACHE_DIR", str(root / "data" / "cache")))
     return db_path, csv_path, cache_dir
 
