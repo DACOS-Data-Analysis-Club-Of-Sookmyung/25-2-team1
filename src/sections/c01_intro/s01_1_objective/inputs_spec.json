@@ -3,10 +3,17 @@
   "section_id": "1.1",
   "title": "연구 목적",
   "prompt": "prompt.md",
-  "llm": {
-    "temperature": 0.2,
-    "max_tokens": 400
+  "llm": {"temperature": 0.2, "max_tokens": 400},
+  "metrics_path": "metrics/metrics_S01_1.json",
+  "evidence_path": "evidence/evidence_S01_1.json",
+  "evidence_spec": {
+    "type": "biz"
   },
-  "metrics_path": [],
-  "evidence_path": []
+  "metrics_spec":[
+    "total_liabilities",
+    "current_liabilities",
+    "non_current_liabilities",
+    "short_term_debt",
+    "long_term_debt"
+  ]
 }
