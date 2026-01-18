@@ -1,12 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Any
+import json
 
 from src.sections._common.io import load_inputs
 
 def build_ctx(workdir: Path, spec: Dict[str, Any]) -> Dict[str, Any]:
-    inputs = load_inputs(workdir, spec_id=spec["id"], allow_missing_evidence=True)
-    meta = inputs["meta"]
+    meta_path = Path(workdir) / "meta" / "meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
 
     fs_overview = "\n".join([
         "- 본 보고서는 DART 사업보고서(document.xml)를 기반으로 분석 대상 기업의 정보를 구성한다.",
