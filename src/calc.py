@@ -972,4 +972,4 @@ def update_benchmark_improved(
       AND f.metric_key IN ({metrics_sql});
     """)
 
-    print("✅ benchmark_improved updated")
+    print("✅ benchmark_improved updated") 
