@@ -40,80 +40,84 @@ def ensure_workdir_layout(workdir: Path) -> None:
     (workdir / "summary").mkdir(parents=True, exist_ok=True)
 
 
-def build_inputs_via_script(workdir: Path, section_dir: Path) -> None:
-    """
-    inputs_spec.json을 기반으로 workdir/meta|metrics|evidence 등을 생성하는 단계.
-    - 구현은 scripts/run_section.py에 있다고 가정하고 여기서는 호출만 한다.
-
-    ⚠️ scripts/run_section.py의 CLI 인자명은 팀 구현에 맞춰야 한다.
-      아래는 표준 예시: python scripts/run_section.py --workdir <...> --spec <inputs_spec.json>
-      인자명이 다르면 cmd만 수정하면 됨.
-    """
-    spec_path = section_dir / "inputs_spec.json"
-    if not spec_path.exists():
-        raise FileNotFoundError(f"inputs_spec.json not found: {spec_path}")
-
-    script_path = Path("scripts/run_section.py")
-    if not script_path.exists():
-        raise FileNotFoundError(f"scripts/run_section.py not found: {script_path.resolve()}")
+def build_inputs_via_script(
+    workdir_root: Path,
+    section_dir: Path,
+    company: str,
+    year: int,
+    topk: int = 5,
+    db_path: Path | None = None,
+) -> Path:
+    SECTIONS_ROOT = (Path(__file__).resolve().parent / "sections").resolve()
+    rel = section_dir.resolve().relative_to(SECTIONS_ROOT)  # c01_intro/s01_1_objective
+    section_arg = "/".join(rel.parts)
 
     cmd = [
-        "python",
-        str(script_path),
-        "--workdir",
-        str(workdir),
-        "--spec",
-        str(spec_path),
+        "python", "scripts/run_section.py",
+        "--company", company,
+        "--year", str(year),
+        "--section", section_arg,
+        "--build",
+        "--workdir", str(workdir_root),
+        "--topk", str(topk),
     ]
+    if db_path is not None:
+        cmd += ["--db-path", str(db_path)]
+
     subprocess.run(cmd, check=True)
 
+    return workdir_root / company / str(year) / section_arg
 
-# ----------------
-# core
-# ----------------
+
+
 def run_section(
-    workdir: Path,
+    workdir_root: Path,
     section_dir: Path,
     client: OpenAICompatClient,
     system_rules: str,
     out_dir: Path,
     *,
+    company: str,
+    year: int,
+    topk: int = 5,
+    db_path: Path | None = None,
     build_inputs: bool = True,
 ) -> Path:
-    """
-    - (NEW) 섹션 실행 전 inputs_spec.json을 scripts/run_section.py로 넘겨 workdir 입력 생성(build_inputs=True)
-    - 섹션 폴더 내 inputs_spec.json / prompt.md / retriever.py 를 사용
-    - retriever.py 내 build_ctx(workdir, spec)로 ctx 생성
-    - 결과를 outputs/sections/<spec_id>.json 으로 저장
-    """
-    workdir = workdir.resolve()
+    workdir_root = workdir_root.resolve()
     section_dir = section_dir.resolve()
-    ensure_workdir_layout(workdir)
 
-    # 0) (선행) inputs 생성: workdir/meta|metrics|evidence 준비
+    # 0) inputs 생성 → section_workdir(out_base)
     if build_inputs:
-        build_inputs_via_script(workdir=workdir, section_dir=section_dir)
+        section_workdir = build_inputs_via_script(
+            workdir_root=workdir_root,
+            section_dir=section_dir,
+            company=company,
+            year=year,
+            topk=topk,
+            db_path=db_path,
+        )
+    else:
+        # build_inputs=False면 이미 만들어져있다고 가정
+        SECTIONS_ROOT = (Path(__file__).resolve().parent / "sections").resolve()
+        rel = section_dir.resolve().relative_to(SECTIONS_ROOT)
+        section_arg = "/".join(rel.parts)
+        section_workdir = workdir_root / company / str(year) / section_arg
 
-    # 1) 섹션 스펙/프롬프트 읽기
+    # 1) spec/prompt
     spec = read_json(section_dir / "inputs_spec.json")
     prompt_md = read_text(section_dir / spec["prompt"])
 
-    # 2) build ctx: src/sections 이하 상대경로로 모듈 경로 생성 (중첩 폴더 대응)
+    # 2) retriever import
     SECTIONS_ROOT = (Path(__file__).resolve().parent / "sections").resolve()
-    try:
-        rel = section_dir.relative_to(SECTIONS_ROOT)
-    except ValueError as e:
-        raise ValueError(
-            f"section_dir({section_dir})가 SECTIONS_ROOT({SECTIONS_ROOT}) 하위가 아닙니다."
-        ) from e
-
-    pkg = "src.sections." + ".".join(rel.parts)  # e.g. src.sections.c09_swot.s09_1_strength
+    rel = section_dir.relative_to(SECTIONS_ROOT)
+    pkg = "src.sections." + ".".join(rel.parts)
 
     retr = importlib.import_module(pkg + ".retriever")
     if not hasattr(retr, "build_ctx"):
         raise AttributeError(f"{pkg}.retriever 에 build_ctx(workdir, spec) 함수가 없습니다.")
 
-    ctx = retr.build_ctx(workdir=workdir, spec=spec)
+    # ✅ 핵심: workdir_root가 아니라 section_workdir(out_base)를 넘김
+    ctx = retr.build_ctx(workdir=section_workdir, spec=spec)
     user_prompt = render_prompt(prompt_md, ctx)
 
     # 3) LLM 호출
@@ -126,13 +130,7 @@ def run_section(
     )
 
     # 4) 저장
-    out = {
-        "id": spec["id"],
-        "section_id": spec["section_id"],
-        "title": spec["title"],
-        "content": raw,
-    }
-
+    out = {"id": spec["id"], "section_id": spec["section_id"], "title": spec["title"], "content": raw}
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{spec['id']}.json"
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -140,55 +138,73 @@ def run_section(
 
 
 async def run_sections_parallel(
-    workdir: Path,
+    workdir_root: Path,
     section_dirs: List[Path],
     client: OpenAICompatClient,
     system_rules: str,
     out_dir: Path,
     *,
+    company: str,
+    year: int,
+    topk: int = 5,
+    db_path: Path | None = None,
     build_inputs: bool = True,
     build_inputs_sequential: bool = True,
 ) -> List[Path]:
-    """
-    병렬 실행:
-    - (권장) build_inputs가 필요한 경우, 입력 생성은 순차(build_inputs_sequential=True)로 먼저 수행한 뒤
-      LLM 호출(run_section)은 thread executor로 병렬 실행한다.
-      (입력 생성이 외부 API/DB를 만질 때 병렬로 때리면 레이트리밋/락 이슈가 생길 수 있어서)
-    """
-    workdir = workdir.resolve()
-    ensure_workdir_layout(workdir)
+    workdir_root = workdir_root.resolve()
 
     if build_inputs and build_inputs_sequential:
         for sdir in section_dirs:
-            build_inputs_via_script(workdir=workdir, section_dir=sdir.resolve())
+            build_inputs_via_script(
+                workdir_root=workdir_root,
+                section_dir=sdir.resolve(),
+                company=company,
+                year=year,
+                topk=topk,
+                db_path=db_path,
+            )
 
-        # inputs 준비 완료 후 LLM 파트만 병렬
         loop = asyncio.get_running_loop()
         tasks = [
             loop.run_in_executor(
                 None,
                 lambda sd=sdir: run_section(
-                    workdir=workdir,
+                    workdir_root=workdir_root,
                     section_dir=sd,
                     client=client,
                     system_rules=system_rules,
                     out_dir=out_dir,
-                    build_inputs=False,   # 이미 inputs 준비했으니까
+                    company=company,
+                    year=year,
+                    topk=topk,
+                    db_path=db_path,
+                    build_inputs=False,
                 ),
             )
             for sdir in section_dirs
         ]
-
         return await asyncio.gather(*tasks)
 
-    # inputs 생성까지 섹션별로 통째 병렬(비권장 옵션)
     loop = asyncio.get_running_loop()
     tasks = [
-        loop.run_in_executor(None, run_section, workdir, sdir, client, system_rules, out_dir, build_inputs)
+        loop.run_in_executor(
+            None,
+            lambda sd=sdir: run_section(
+                workdir_root=workdir_root,
+                section_dir=sd,
+                client=client,
+                system_rules=system_rules,
+                out_dir=out_dir,
+                company=company,
+                year=year,
+                topk=topk,
+                db_path=db_path,
+                build_inputs=build_inputs,
+            ),
+        )
         for sdir in section_dirs
     ]
     return await asyncio.gather(*tasks)
-
 
 # ----------------
 # bridge summary
