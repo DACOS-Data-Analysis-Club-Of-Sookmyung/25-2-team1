@@ -1,7 +1,6 @@
 # scripts/run_section.py
 from __future__ import annotations
 
-import os
 import sys
 import json
 import argparse
@@ -16,7 +15,7 @@ if str(ROOT) not in sys.path:
 load_dotenv()
 
 DEFAULT_DB = ROOT / "data" / "duckdb" / "dart.duckdb"
-DEFAULT_WORKDIR = ROOT / "data" / "workdir"
+DEFAULT_WORKDIR = ROOT / "workdir"
 SECTIONS_ROOT = ROOT / "src" / "sections"
 
 
@@ -57,12 +56,12 @@ def main():
         out_base.mkdir(parents=True, exist_ok=True)
         print(f"[INFO] out_base = {out_base}")
 
-        # builders
-        from src.sections._common.builders.create_meta import build_meta, save_meta_json
-        from src.sections._common.builders.create_metrics import build_metrics_for_section, save_metrics_json
-        from src.sections._common.builders.create_evidence import build_evidence_for_section, save_evidence_json
+        # ✅ builders (네가 옮긴 경로로 import)
+        from prompts.common.builders.create_meta import build_meta, save_meta_json
+        from prompts.common.builders.create_metrics import build_metrics_for_section, save_metrics_json
+        from prompts.common.builders.create_evidence import build_evidence_for_section, save_evidence_json
 
-        # 1) meta (✅ report_id 인자 없음)
+        # 1) meta
         meta = build_meta(con, corp_name_kr=args.company, bsns_year=int(args.year))
         meta_path = out_base / "meta" / "meta.json"
         save_meta_json(meta, meta_path)
@@ -73,36 +72,29 @@ def main():
             raise RuntimeError("[ERR] meta.report_id가 없습니다. 먼저 run_ingest로 reports가 적재됐는지 확인해줘.")
 
         # 2) metrics
-        metrics_spec = spec.get("metrics_spec") or {}
+        metrics_spec = spec.get("metrics_spec") or []
         metrics_json = build_metrics_for_section(con, report_id=str(report_id), metrics_spec=metrics_spec)
         metrics_path = out_base / (spec.get("metrics_path") or "metrics/metrics.json")
         save_metrics_json(metrics_json, metrics_path)
         print(f"[OK] wrote metrics: {metrics_path}")
 
         # 3) evidence
-        evidence_spec = spec.get("evidence_spec")
+        evidence_spec = spec.get("evidence_spec")  # biz일 때만 의미 있음
 
-        # ✅ section1 말고는 evidence_spec을 굳이 안 쓰고, metrics_spec 기반으로 자동 생성
-        # - evidence_spec이 없고 metrics_spec이 있으면 notes_by_metrics로 생성
-        if not evidence_spec and (spec.get("metrics_spec")):
-            evidence_spec = {"type": "notes_by_metrics", "topk_chunks_per_note": int(args.topk)}
-
-        # - evidence_spec이 있고 type=biz면 I/II 전체 텍스트 evidence 생성
-        if evidence_spec:
-            evidence_json = build_evidence_for_section(
-                con=con,
-                report_id=str(report_id),
-                evidence_spec=evidence_spec,
-                metrics_json=metrics_json,
-            )
-            evidence_path = out_base / (spec.get("evidence_path") or "evidence/evidence.json")
-            save_evidence_json(evidence_json, evidence_path)
-            print(f"[OK] wrote evidence: {evidence_path}")
-        else:
-            print("[INFO] evidence_spec not found and metrics_spec empty -> skip evidence")
+        evidence_json = build_evidence_for_section(
+            con=con,
+            report_id=str(report_id),
+            evidence_spec=evidence_spec,      # ✅ biz 판단에만 사용
+            metrics_json=metrics_json,        # ✅ notes_by_metrics에 필수
+            max_notes=8,
+            topk_chunks_per_note=int(args.topk),
+            topk_biz_chunks=80,
+        )
+        evidence_path = out_base / (spec.get("evidence_path") or "evidence/evidence.json")
+        save_evidence_json(evidence_json, evidence_path)
+        print(f"[OK] wrote evidence: {evidence_path}")
 
         print("\n✅ build done.")
-
     finally:
         con.close()
 

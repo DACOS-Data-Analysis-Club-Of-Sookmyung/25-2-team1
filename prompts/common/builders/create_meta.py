@@ -1,4 +1,4 @@
-# src/sections/_common/builders/create_meta.py
+# prompts/common/builders/create_meta.py
 from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Any
@@ -40,13 +40,27 @@ def build_meta(
      asof_date, stock_price, shares_outstanding, scale) = row
 
     # reports에서 report_id 찾아오기 (이미 ingest 되어있다는 전제)
+    corp_code_str = str(corp_code).strip()
+    corp_code8 = corp_code_str.zfill(8) if corp_code_str.isdigit() else corp_code_str
+
+    # 1) 8자리 코드로 먼저 조회
     rep = con.execute("""
       SELECT report_id, rcept_no
       FROM reports
       WHERE corp_code=? AND bsns_year=?
       ORDER BY try_cast(rcept_no AS BIGINT) DESC
       LIMIT 1
-    """, [str(corp_code), int(bsns_year)]).fetchone()
+    """, [corp_code8, int(bsns_year)]).fetchone()
+    
+    # 2) 그래도 없으면 원본 코드로 fallback
+    if rep is None and corp_code8 != corp_code_str:
+        rep = con.execute("""
+          SELECT report_id, rcept_no
+          FROM reports
+          WHERE corp_code=? AND bsns_year=?
+          ORDER BY try_cast(rcept_no AS BIGINT) DESC
+          LIMIT 1
+        """, [corp_code_str, int(bsns_year)]).fetchone()
 
     report_id = rep[0] if rep else None
     rcept_no = rep[1] if rep else None
