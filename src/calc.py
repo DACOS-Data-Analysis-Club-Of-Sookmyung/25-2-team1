@@ -1,6 +1,7 @@
-# calc.py
+# src/calc.py
 import re
-from typing import List, Optional
+from typing import List
+
 
 # ============================================================
 # 0) label 정규화 함수 (ACCOUNT_MAP와 SQL norm 규칙 일치)
@@ -51,15 +52,15 @@ ACCOUNT_MAP = [
     ("IS_CIS", "INTEREST_EXP", ["이자비용", "금융비용"]),
 
     ("IS_CIS", "PRE_TAX_INCOME", ["법인세비용차감전순이익", "법인세비용차감전순이익(손실)"]),
-    ("IS_CIS", "TAX_EXP", ["법인세비용", "법인세비용(수익)", "법인세수익(비용)"]),
+    ("IS_CIS", "TAX_EXP", ["법인세비용", "법인세비용(수익)", "법인세수익(비용)", "법인세수익(비용)"]),
     ("IS_CIS", "NET_INCOME", ["당기순이익", "당기순이익(손실)", "당기순이익(손실)(A)"]),
 
     ("IS_CIS", "SGA_EXPENSES", ["판매비와관리비", "판관비"]),
 
     # --- CF ---
-    ("CF", "OCF", ["영업활동으로 인한 현금흐름","영업활동현금흐름", "영업활동으로부터의 현금흐름"]),
-    ("CF", "ICF", ["투자활동으로 인한 현금흐름","투자활동현금흐름"]),
-    ("CF", "FCF_FIN", ["재무활동으로 인한 현금흐름","재무활동현금흐름"]),
+    ("CF", "OCF", ["영업활동으로 인한 현금흐름", "영업활동현금흐름", "영업활동으로부터의 현금흐름"]),
+    ("CF", "ICF", ["투자활동으로 인한 현금흐름", "투자활동현금흐름"]),
+    ("CF", "FCF_FIN", ["재무활동으로 인한 현금흐름", "재무활동현금흐름"]),
     ("CF", "PURCHASE_PPE", ["유형자산의 취득"]),
     ("CF", "PURCHASE_INTANGIBLES", ["무형자산의 취득"]),
     ("CF", "PURCHASE_LT_FIN_ASSETS", ["장기금융상품의 취득"]),
@@ -130,7 +131,6 @@ def build_account_map_rules(con):
 # ============================================================
 
 def create_calc_views(con):
-
     # --- v_fin_long_raw ---
     con.execute("DROP VIEW IF EXISTS v_fin_long_raw;")
     con.execute(r"""
@@ -247,8 +247,6 @@ def create_calc_views(con):
     """)
 
     # --- v_analysis_compare ---
-    # ⚠️ NOTE: diff_rate는 현재 "퍼센트(×100)" 형태로 계산되어 있음.
-    # metrics.json에서 0.111 같은 "비율"을 원하면 run/output 단계에서 /100 하거나 여기서 바꾸면 됨.
     con.execute("DROP VIEW IF EXISTS v_analysis_compare;")
     con.execute(r"""
     CREATE VIEW v_analysis_compare AS
@@ -431,34 +429,6 @@ def create_calc_views(con):
         list(DISTINCT line_item_id) AS line_item_ids
       FROM candidates
       GROUP BY 1,2,3,4
-    ),
-    notes_evidence AS (
-      SELECT
-        rp.corp_code,
-        rp.bsns_year,
-        nl.report_id,
-        nl.line_item_id,
-        string_agg(tc.text, '\n\n') AS note_text
-      FROM note_links nl
-      JOIN reports rp ON rp.report_id = nl.report_id
-      LEFT JOIN report_sections rs ON rs.section_id = nl.note_section_id
-      LEFT JOIN rag_text_chunks tc
-        ON tc.section_id = rs.section_id
-       AND tc.section_type = 'notes'
-      GROUP BY rp.corp_code, rp.bsns_year, nl.report_id, nl.line_item_id
-    ),
-    note_by_stdkey AS (
-      SELECT
-        bv.corp_code,
-        bv.bsns_year,
-        bv.report_id,
-        bv.std_key,
-        string_agg(ne.note_text, '\n\n') AS note_text_all
-      FROM base_vals bv
-      JOIN notes_evidence ne
-        ON ne.report_id = bv.report_id
-       AND ne.line_item_id = ANY(bv.line_item_ids)
-      GROUP BY 1,2,3,4
     )
     SELECT
       br.corp_code,
@@ -472,7 +442,7 @@ def create_calc_views(con):
       ) AS value_won,
       bv.labels,
       bv.note_refs,
-      nb.note_text_all AS note_text,
+      NULL AS note_text,
       bv.cand_rows,
       bv.cand_distinct_values
     FROM base_reports br
@@ -482,11 +452,6 @@ def create_calc_views(con):
      AND bv.bsns_year = br.bsns_year
      AND bv.report_id = br.report_id
      AND bv.std_key   = r.std_key
-    LEFT JOIN note_by_stdkey nb
-      ON nb.corp_code = br.corp_code
-     AND nb.bsns_year = br.bsns_year
-     AND nb.report_id = br.report_id
-     AND nb.std_key   = r.std_key
     LEFT JOIN market_core mk
       ON mk.corp_code = br.corp_code
      AND mk.bsns_year = br.bsns_year
@@ -528,16 +493,6 @@ def create_calc_views(con):
     derived AS (
       SELECT
         b.*,
-
-        COALESCE(
-          long_term_debt,
-          non_current_liabilities,
-          CASE
-            WHEN total_liabilities IS NOT NULL AND current_liabilities IS NOT NULL
-            THEN total_liabilities - current_liabilities
-            ELSE NULL
-          END
-        ) AS long_term_debt_resolved,
 
         CASE
           WHEN tax_exp IS NULL OR pre_tax_income IS NULL OR pre_tax_income = 0 THEN NULL
@@ -585,7 +540,6 @@ def create_calc_views(con):
 
         CASE WHEN net_income IS NOT NULL AND shares_outstanding IS NOT NULL AND shares_outstanding <> 0
              THEN (net_income + COALESCE(depreciation,0)) / shares_outstanding ELSE NULL END AS cfps
-
       FROM base b
     ),
     raw_rows AS (
@@ -677,13 +631,7 @@ def create_calc_views(con):
         COALESCE(SUM(CASE WHEN role='denominator' THEN value_won END), 0) AS denominator,
 
         SUM(CASE WHEN required THEN 1 ELSE 0 END) AS required_cnt,
-        SUM(CASE WHEN required AND value_won IS NOT NULL THEN 1 ELSE 0 END) AS required_hit,
-
-        MAX(value_won) FILTER (WHERE item_key='NET_INCOME')     AS ni,
-        MAX(value_won) FILTER (WHERE item_key='REVENUE')        AS rev,
-        MAX(value_won) FILTER (WHERE item_key='TOTAL_ASSETS')   AS ta,
-        MAX(value_won) FILTER (WHERE item_key='EQUITY')         AS eq,
-        MAX(value_won) FILTER (WHERE item_key='TAX_RATE')       AS tax_rate
+        SUM(CASE WHEN required AND value_won IS NOT NULL THEN 1 ELSE 0 END) AS required_hit
       FROM grid
       GROUP BY corp_code, bsns_year, report_id, ratio_key
     )
@@ -708,7 +656,7 @@ def create_calc_views(con):
 
 
 # ============================================================
-# 4) metric_catalog 
+# 4) metric_catalog
 # ============================================================
 
 def create_metric_catalog(con):
@@ -723,7 +671,6 @@ def create_metric_catalog(con):
     );
     """)
 
-    # (polarity 수정)
     con.execute("""
     INSERT INTO metric_catalog VALUES
     ('TOTAL_ASSETS', '자산총계', 'raw', 'KRW', TRUE),
@@ -739,7 +686,6 @@ def create_metric_catalog(con):
     ('PARENT_EQUITY', '지배기업 소유주지분', 'raw', 'KRW', TRUE),
     ('RETAINED_EARNINGS', '이익잉여금', 'raw', 'KRW', TRUE),
     ('NON_CONTROLLING_INTEREST', '비지배지분', 'raw', 'KRW', TRUE),
-
     ('CAPITAL_STOCK', '자본금', 'raw', 'KRW', TRUE),
 
     ('REVENUE', '매출액', 'raw', 'KRW', TRUE),
@@ -777,13 +723,13 @@ def create_metric_catalog(con):
     ;
     """)
 
-from typing import List
 
 # ============================================================
-# 1) fact_metrics 테이블 생성
+# 5) fact_metrics
 # ============================================================
 
 def create_fact_metrics_table(con):
+    # ✅ DROP 금지 (target → benchmark 순서로 적재 시 테이블이 날아가면 bench 비교가 누락됨)
     con.execute("""
     CREATE TABLE IF NOT EXISTS fact_metrics (
       corp_code VARCHAR,
@@ -798,176 +744,256 @@ def create_fact_metrics_table(con):
       unit VARCHAR,
       benchmark_corp_code VARCHAR,
       benchmark_value DOUBLE,
-      benchmark_improved BOOLEAN
+      benchmark_improved BOOLEAN,
+      PRIMARY KEY (corp_code, bsns_year, metric_key)
     );
     """)
 
 
-# ============================================================
-# 2) fact_metrics 적재 (요청 범위 필터링)
-# ============================================================
-
-def load_fact_metrics(
-    con,
-    corp_code: str,
-    bsns_year: int,
-    metrics_spec: List[str]
-) -> None:
+def load_fact_metrics(con, corp_code: str, bsns_year: int, metrics_spec: List[str]) -> None:
     """
-    요청 범위(corp_code / bsns_year / metrics_spec)에 해당하는
-    지표만 fact_metrics에 적재
+    요청 범위(corp_code / bsns_year / metrics_spec)에 해당하는 지표만 fact_metrics에 적재
+    - SSOT: request_metrics TEMP 테이블
+    - ratio/derived/market은 report_id 중복 가능 → QUALIFY로 dedup 후 적재
     """
-
     if not metrics_spec:
         raise ValueError("metrics_spec is empty")
 
-    metrics_sql = ", ".join([f"'{m}'" for m in metrics_spec])
-
     create_fact_metrics_table(con)
 
-    # 🔥 재적재 (요청 범위만)
-    con.execute("""
-      DELETE FROM fact_metrics
-      WHERE corp_code = ? AND bsns_year = ?
-    """, [corp_code, bsns_year])
+    # 요청 범위만 clear
+    con.execute(
+        "DELETE FROM fact_metrics WHERE corp_code = ? AND bsns_year = ?",
+        [corp_code, bsns_year],
+    )
 
-    # --------------------------------------------------------
-    # RAW (v_analysis_compare)
-    # --------------------------------------------------------
-    con.execute(f"""
-    INSERT INTO fact_metrics
-    SELECT
-      a.corp_code,
-      a.bsns_year,
-      a.std_key                 AS metric_key,
-      mc.metric_name_ko,
-      'raw'                     AS metric_type,
-      a.val_curr                AS value,
-      a.val_prev                AS value_prev,
-      a.diff_amt                AS yoy_abs,
-      (a.diff_rate / 100.0)     AS yoy_pct,
-      mc.unit,
-      NULL, NULL, NULL
-    FROM v_analysis_compare a
-    JOIN metric_catalog mc
-      ON mc.metric_key = a.std_key
-    WHERE a.corp_code = '{corp_code}'
-      AND a.bsns_year = {bsns_year}
-      AND a.std_key IN ({metrics_sql})
-      AND mc.metric_type = 'raw';
-    """)
+    # ----------------------------
+    # RAW
+    # ----------------------------
+    con.execute(
+        """
+        INSERT INTO fact_metrics
+        SELECT
+          a.corp_code,
+          a.bsns_year,
+          a.std_key                 AS metric_key,
+          mc.metric_name_ko,
+          'raw'                     AS metric_type,
+          a.val_curr                AS value,
+          a.val_prev                AS value_prev,
+          a.diff_amt                AS yoy_abs,
+          (a.diff_rate / 100.0)     AS yoy_pct,
+          mc.unit,
+          NULL, NULL, NULL
+        FROM v_analysis_compare a
+        JOIN metric_catalog mc
+          ON mc.metric_key = a.std_key
+        WHERE a.corp_code = ?
+          AND a.bsns_year = ?
+          AND mc.metric_type = 'raw'
+          AND EXISTS (SELECT 1 FROM request_metrics rm WHERE rm.metric_key = a.std_key);
+        """,
+        [corp_code, bsns_year],
+    )
 
-    # --------------------------------------------------------
-    # RATIO (v_financial_ratios)
-    # --------------------------------------------------------
-    con.execute(f"""
-    INSERT INTO fact_metrics
-    SELECT
-      cur.corp_code,
-      cur.bsns_year,
-      cur.ratio_key             AS metric_key,
-      mc.metric_name_ko,
-      'ratio'                   AS metric_type,
-      cur.ratio_value           AS value,
-      prev.ratio_value          AS value_prev,
-      (cur.ratio_value - prev.ratio_value) AS yoy_abs,
-      CASE
-        WHEN prev.ratio_value IS NOT NULL AND prev.ratio_value != 0
-        THEN (cur.ratio_value - prev.ratio_value) / abs(prev.ratio_value)
-        ELSE NULL
-      END AS yoy_pct,
-      mc.unit,
-      NULL, NULL, NULL
-    FROM v_financial_ratios cur
-    LEFT JOIN v_financial_ratios prev
-      ON cur.corp_code = prev.corp_code
-     AND cur.ratio_key = prev.ratio_key
-     AND cur.bsns_year = prev.bsns_year + 1
-    JOIN metric_catalog mc
-      ON mc.metric_key = cur.ratio_key
-    WHERE cur.corp_code = '{corp_code}'
-      AND cur.bsns_year = {bsns_year}
-      AND cur.ratio_key IN ({metrics_sql})
-      AND mc.metric_type = 'ratio';
-    """)
+    # ----------------------------
+    # RATIO (dedup)
+    # ----------------------------
+    con.execute(
+        """
+        WITH cur_dedup AS (
+          SELECT
+            cur.corp_code,
+            cur.bsns_year,
+            cur.ratio_key,
+            cur.ratio_value,
+            cur.report_id
+          FROM v_financial_ratios cur
+          WHERE cur.corp_code = ?
+            AND cur.bsns_year = ?
+            AND EXISTS (SELECT 1 FROM request_metrics rm WHERE rm.metric_key = cur.ratio_key)
+          QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY cur.corp_code, cur.bsns_year, cur.ratio_key
+            ORDER BY (cur.ratio_value IS NOT NULL) DESC, abs(cur.ratio_value) DESC, cur.report_id DESC
+          ) = 1
+        ),
+        prev_dedup AS (
+          SELECT
+            prev.corp_code,
+            prev.bsns_year,
+            prev.ratio_key,
+            prev.ratio_value,
+            prev.report_id
+          FROM v_financial_ratios prev
+          WHERE prev.corp_code = ?
+            AND prev.bsns_year = ? - 1
+          QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY prev.corp_code, prev.bsns_year, prev.ratio_key
+            ORDER BY (prev.ratio_value IS NOT NULL) DESC, abs(prev.ratio_value) DESC, prev.report_id DESC
+          ) = 1
+        )
+        INSERT INTO fact_metrics
+        SELECT
+          c.corp_code,
+          c.bsns_year,
+          c.ratio_key                  AS metric_key,
+          mc.metric_name_ko,
+          'ratio'                      AS metric_type,
+          c.ratio_value                AS value,
+          p.ratio_value                AS value_prev,
+          (c.ratio_value - p.ratio_value) AS yoy_abs,
+          CASE
+            WHEN p.ratio_value IS NOT NULL AND p.ratio_value != 0
+            THEN (c.ratio_value - p.ratio_value) / abs(p.ratio_value)
+            ELSE NULL
+          END AS yoy_pct,
+          mc.unit,
+          NULL, NULL, NULL
+        FROM cur_dedup c
+        LEFT JOIN prev_dedup p
+          ON c.corp_code = p.corp_code
+         AND c.ratio_key = p.ratio_key
+        JOIN metric_catalog mc
+          ON mc.metric_key = c.ratio_key
+        WHERE mc.metric_type = 'ratio';
+        """,
+        [corp_code, bsns_year, corp_code, bsns_year],
+    )
 
-    # --------------------------------------------------------
-    # DERIVED / MARKET (v_value_augmented)
-    # --------------------------------------------------------
-    con.execute(f"""
-    INSERT INTO fact_metrics
-    SELECT
-      cur.corp_code,
-      cur.bsns_year,
-      cur.std_key               AS metric_key,
-      mc.metric_name_ko,
-      mc.metric_type,
-      cur.value_won             AS value,
-      prev.value_won            AS value_prev,
-      (cur.value_won - prev.value_won) AS yoy_abs,
-      CASE
-        WHEN prev.value_won IS NOT NULL AND prev.value_won != 0
-        THEN (cur.value_won - prev.value_won) / abs(prev.value_won)
-        ELSE NULL
-      END AS yoy_pct,
-      mc.unit,
-      NULL, NULL, NULL
-    FROM v_value_augmented cur
-    LEFT JOIN v_value_augmented prev
-      ON cur.corp_code = prev.corp_code
-     AND cur.std_key   = prev.std_key
-     AND cur.bsns_year = prev.bsns_year + 1
-    JOIN metric_catalog mc
-      ON mc.metric_key = cur.std_key
-    WHERE cur.corp_code = '{corp_code}'
-      AND cur.bsns_year = {bsns_year}
-      AND cur.std_key IN ({metrics_sql})
-      AND mc.metric_type IN ('derived','market');
-    """)
+    # ----------------------------
+    # DERIVED / MARKET (dedup)
+    # ----------------------------
+    con.execute(
+        """
+        WITH cur_dedup AS (
+          SELECT
+            cur.corp_code,
+            cur.bsns_year,
+            cur.std_key,
+            cur.value_won,
+            cur.report_id
+          FROM v_value_augmented cur
+          WHERE cur.corp_code = ?
+            AND cur.bsns_year = ?
+            AND EXISTS (SELECT 1 FROM request_metrics rm WHERE rm.metric_key = cur.std_key)
+          QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY cur.corp_code, cur.bsns_year, cur.std_key
+            ORDER BY (cur.value_won IS NOT NULL) DESC, abs(cur.value_won) DESC, cur.report_id DESC
+          ) = 1
+        ),
+        prev_dedup AS (
+          SELECT
+            prev.corp_code,
+            prev.bsns_year,
+            prev.std_key,
+            prev.value_won,
+            prev.report_id
+          FROM v_value_augmented prev
+          WHERE prev.corp_code = ?
+            AND prev.bsns_year = ? - 1
+          QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY prev.corp_code, prev.bsns_year, prev.std_key
+            ORDER BY (prev.value_won IS NOT NULL) DESC, abs(prev.value_won) DESC, prev.report_id DESC
+          ) = 1
+        )
+        INSERT INTO fact_metrics
+        SELECT
+          c.corp_code,
+          c.bsns_year,
+          c.std_key                    AS metric_key,
+          mc.metric_name_ko,
+          mc.metric_type,
+          c.value_won                  AS value,
+          p.value_won                  AS value_prev,
+          (c.value_won - p.value_won)  AS yoy_abs,
+          CASE
+            WHEN p.value_won IS NOT NULL AND p.value_won != 0
+            THEN (c.value_won - p.value_won) / abs(p.value_won)
+            ELSE NULL
+          END AS yoy_pct,
+          mc.unit,
+          NULL, NULL, NULL
+        FROM cur_dedup c
+        LEFT JOIN prev_dedup p
+          ON c.corp_code = p.corp_code
+         AND c.std_key   = p.std_key
+        JOIN metric_catalog mc
+          ON mc.metric_key = c.std_key
+        WHERE mc.metric_type IN ('derived','market');
+        """,
+        [corp_code, bsns_year, corp_code, bsns_year],
+    )
 
-    # 🔎 로깅
-    print(con.execute(f"""
-      SELECT metric_type, COUNT(*) AS cnt
-      FROM fact_metrics
-      WHERE corp_code = '{corp_code}'
-        AND bsns_year = {bsns_year}
-        AND metric_key IN ({metrics_sql})
-      GROUP BY 1 ORDER BY 1;
-    """).df())
 
-
-# ============================================================
-# 3) benchmark_improved 계산 (후처리)
-# ============================================================
-
-def update_benchmark_improved(
-    con,
-    corp_code: str,
-    bsns_year: int,
-    metrics_spec: List[str]
-):
+def update_benchmark_values(con, corp_code: str, bsns_year: int, metrics_spec: List[str]) -> str:
     """
-    metric_catalog.polarity 규칙을 사용하여
-    benchmark_improved 계산
+    benchmark_map을 기반으로 fact_metrics에 benchmark_corp_code / benchmark_value 채우기
+    전제: 벤치 기업도 동일 metric_key로 fact_metrics가 이미 적재되어 있어야 함
     """
+    if not metrics_spec:
+        raise ValueError("metrics_spec is empty")
 
-    metrics_sql = ", ".join([f"'{m}'" for m in metrics_spec])
+    row = con.execute(
+        """
+        SELECT bench_corp_code
+        FROM benchmark_map
+        WHERE corp_code = ?
+          AND year = ?
+        """,
+        [corp_code, bsns_year],
+    ).fetchone()
 
-    con.execute(f"""
-    UPDATE fact_metrics f
-    SET benchmark_improved =
-      CASE
-        WHEN f.benchmark_value IS NULL THEN NULL
-        WHEN mc.polarity IS NULL THEN NULL
-        WHEN mc.polarity = TRUE  THEN (f.value >= f.benchmark_value)
-        WHEN mc.polarity = FALSE THEN (f.value <= f.benchmark_value)
-        ELSE NULL
-      END
-    FROM metric_catalog mc
-    WHERE f.metric_key = mc.metric_key
-      AND f.corp_code = '{corp_code}'
-      AND f.bsns_year = {bsns_year}
-      AND f.metric_key IN ({metrics_sql});
-    """)
+    if not row or not row[0]:
+        raise RuntimeError(f"benchmark_map에 벤치 기업이 없습니다: corp_code={corp_code}, year={bsns_year}")
 
-    print("✅ benchmark_improved updated") 
+    bench_corp_code = row[0]
+
+    con.execute(
+        """
+        UPDATE fact_metrics f
+        SET
+          benchmark_corp_code = ?,
+          benchmark_value = b.value
+        FROM fact_metrics b
+        WHERE f.corp_code = ?
+          AND f.bsns_year = ?
+          AND b.corp_code = ?
+          AND b.bsns_year = ?
+          AND f.metric_key = b.metric_key
+          AND EXISTS (SELECT 1 FROM request_metrics rm WHERE rm.metric_key = f.metric_key);
+        """,
+        [bench_corp_code, corp_code, bsns_year, bench_corp_code, bsns_year],
+    )
+
+    print(f"✅ benchmark_value updated: corp={corp_code}, year={bsns_year}, bench={bench_corp_code}")
+    return bench_corp_code
+
+
+def update_benchmark_improved(con, corp_code: str, bsns_year: int, metrics_spec: List[str]) -> None:
+    """
+    metric_catalog.polarity 규칙으로 benchmark_improved 계산
+    """
+    if not metrics_spec:
+        raise ValueError("metrics_spec is empty")
+
+    con.execute(
+        """
+        UPDATE fact_metrics f
+        SET benchmark_improved =
+          CASE
+            WHEN f.benchmark_value IS NULL THEN NULL
+            WHEN mc.polarity IS NULL THEN NULL
+            WHEN mc.polarity = TRUE  THEN (f.value >= f.benchmark_value)
+            WHEN mc.polarity = FALSE THEN (f.value <= f.benchmark_value)
+            ELSE NULL
+          END
+        FROM metric_catalog mc
+        WHERE f.metric_key = mc.metric_key
+          AND f.corp_code = ?
+          AND f.bsns_year = ?
+          AND EXISTS (SELECT 1 FROM request_metrics rm WHERE rm.metric_key = f.metric_key);
+        """,
+        [corp_code, bsns_year],
+    )
+
+    print("✅ benchmark_improved updated (request_metrics scope)")

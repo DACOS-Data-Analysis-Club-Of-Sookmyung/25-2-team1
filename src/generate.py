@@ -66,7 +66,7 @@ def build_inputs_via_script(
 
     subprocess.run(cmd, check=True)
 
-    return workdir_root / company / str(year) / section_arg
+    return workdir_root
 
 
 
@@ -88,7 +88,7 @@ def run_section(
 
     # 0) inputs 생성 → section_workdir(out_base)
     if build_inputs:
-        section_workdir = build_inputs_via_script(
+        build_inputs_via_script(
             workdir_root=workdir_root,
             section_dir=section_dir,
             company=company,
@@ -96,12 +96,7 @@ def run_section(
             topk=topk,
             db_path=db_path,
         )
-    else:
-        # build_inputs=False면 이미 만들어져있다고 가정
-        SECTIONS_ROOT = (Path(__file__).resolve().parent / "sections").resolve()
-        rel = section_dir.resolve().relative_to(SECTIONS_ROOT)
-        section_arg = "/".join(rel.parts)
-        section_workdir = workdir_root / company / str(year) / section_arg
+
 
     # 1) spec/prompt
     spec = read_json(section_dir / "inputs_spec.json")
@@ -117,7 +112,7 @@ def run_section(
         raise AttributeError(f"{pkg}.retriever 에 build_ctx(workdir, spec) 함수가 없습니다.")
 
     # ✅ 핵심: workdir_root가 아니라 section_workdir(out_base)를 넘김
-    ctx = retr.build_ctx(workdir=section_workdir, spec=spec)
+    ctx = retr.build_ctx(workdir=workdir_root, spec=spec)
     user_prompt = render_prompt(prompt_md, ctx)
 
     # 3) LLM 호출
