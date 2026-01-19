@@ -31,19 +31,12 @@
 
 
 ## 3. 전체 아키텍처
-[사용자 요청]
- (회사, 연도)
-        ↓
-[DART 사업보고서 수집]
-(I, II, III-2, III-3 항목을 크롤링하여 파싱 및 정규화 후 DB 적재 + 검증)
-        ↓
-[지표 계산 + 검증]
-        ↓
-[LLM 리포트 생성]
- (근거 포함)
+<img width="975" height="516" alt="image" src="https://github.com/user-attachments/assets/e6125533-4839-4a51-85f2-22ff348f1533" />
+<img width="980" height="538" alt="image" src="https://github.com/user-attachments/assets/080b6cd7-d667-4f60-9a99-a654da8e0838" />
 
 
-4. 실행 방법
+
+## 4. 실행 방법
 1️⃣ 환경 설정
 pip install -r requirements.txt
 
@@ -53,7 +46,7 @@ python run/app.py --company 삼성전자 --year 2024
 
 
 
-## 4. 기대 효과
+## 5. 기대 효과
 
 📉 수치 오류 없는 재무 분석
 
