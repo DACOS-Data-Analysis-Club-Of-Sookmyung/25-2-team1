@@ -28,12 +28,23 @@ def discover_section_dirs() -> list[Path]:
     return sorted([p.parent for p in sections_root.rglob("inputs_spec.json")])
 
 
-def run_async(coro):
+def run_async(coro_factory):
+    """
+    coro_factory: 호출할 때마다 '새로운 coroutine'을 만들어 반환하는 함수
+    예: lambda: run_sections_parallel(...)
+    """
     try:
-        return asyncio.run(coro)
+        return asyncio.run(coro_factory())
     except RuntimeError:
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(coro)
+        # Streamlit thread에는 event loop가 없을 수 있으니 새로 만든다
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(coro_factory())
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
 
 
 st.set_page_config(page_title="DART 재무 리포트 생성 데모", layout="centered")
@@ -60,19 +71,17 @@ if st.button("리포트 생성"):
         out_dir.mkdir(parents=True, exist_ok=True)
 
         with st.spinner("입력 생성 + 섹션 병렬 실행 중..."):
-            run_async(
-                run_sections_parallel(
-                    workdir_root=workdir_root,
-                    section_dirs=section_dirs,     
-                    client=client,
-                    system_rules=system_rules,
-                    out_dir=out_dir,
-                    company=corp_name,
-                    year=int(bsns_year),
-                    build_inputs=True,
-                    build_inputs_sequential=True,
-                )
-            )
+            run_async(lambda: run_sections_parallel(
+                workdir_root=workdir_root,
+                section_dirs=section_dirs,
+                client=client,
+                system_rules=system_rules,
+                out_dir=out_dir,
+                company=corp_name,
+                year=int(bsns_year),
+                build_inputs=True,
+                build_inputs_sequential=True,
+            ))
 
         st.success("완료!")
         st.write("결과 위치:", str(out_dir))

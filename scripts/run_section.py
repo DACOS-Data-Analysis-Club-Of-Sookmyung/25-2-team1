@@ -53,18 +53,27 @@ def main():
             print("[INFO] --build not set. nothing to do.")
             return
 
-        out_base = workdir_root / args.company / str(args.year) / args.section
+        out_base = workdir_root
         out_base.mkdir(parents=True, exist_ok=True)
+        
         print(f"[INFO] out_base = {out_base}")
+
+        (workdir_root / "meta").mkdir(parents=True, exist_ok=True)
+        (workdir_root / "metrics").mkdir(parents=True, exist_ok=True)
+        (workdir_root / "evidence").mkdir(parents=True, exist_ok=True)
+        (workdir_root / "summary").mkdir(parents=True, exist_ok=True)
 
         # builders
         from src.sections._common.builders.create_meta import build_meta, save_meta_json
         from src.sections._common.builders.create_metrics import build_metrics_for_section, save_metrics_json
         from src.sections._common.builders.create_evidence import build_evidence_for_section, save_evidence_json
 
+        sec_leaf = args.section.split("/")[-1]       # s02_1_assets
+        stem = "_".join(sec_leaf.split("_")[:2])   
+
         # 1) meta (✅ report_id 인자 없음)
         meta = build_meta(con, corp_name_kr=args.company, bsns_year=int(args.year))
-        meta_path = out_base / "meta" / "meta.json"
+        meta_path = workdir_root / "meta" / "meta.json"
         save_meta_json(meta, meta_path)
         print(f"[OK] wrote meta: {meta_path}")
 
@@ -75,7 +84,7 @@ def main():
         # 2) metrics
         metrics_spec = spec.get("metrics_spec") or {}
         metrics_json = build_metrics_for_section(con, report_id=str(report_id), metrics_spec=metrics_spec)
-        metrics_path = out_base / (spec.get("metrics_path") or "metrics/metrics.json")
+        metrics_path = workdir_root / "metrics" / f"{stem}_metrics.json"
         save_metrics_json(metrics_json, metrics_path)
         print(f"[OK] wrote metrics: {metrics_path}")
 
@@ -95,7 +104,7 @@ def main():
                 evidence_spec=evidence_spec,
                 metrics_json=metrics_json,
             )
-            evidence_path = out_base / (spec.get("evidence_path") or "evidence/evidence.json")
+            evidence_path = workdir_root / "evidence" / f"{stem}_evidence.json"
             save_evidence_json(evidence_json, evidence_path)
             print(f"[OK] wrote evidence: {evidence_path}")
         else:
