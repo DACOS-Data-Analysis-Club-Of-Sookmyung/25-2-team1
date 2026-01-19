@@ -211,21 +211,14 @@ dart-financial-genai-report/
 
 7. 실행 방법
 1️⃣ 환경 설정
+```bash
 pip install -r requirements.txt
-
+```
 
 2️⃣ 전체 실행
+```bash
 python run/app.py --company 삼성전자 --year 2024
-
-8. 출력 예시
-
-✔ 계산된 재무 지표 (표 기반)
-
-✔ 관련 주석 텍스트 근거
-
-✔ 표 참조([[TABLE:...]]) 포함
-
-✔ 출처 명시된 AI 리포트 문단
+```
 
 9. 기대 효과
 
@@ -251,7 +244,7 @@ python run/app.py --company 삼성전자 --year 2024
 
 ### 1) Install
 ```bash
-pip install -U duckdb sentence-transformers faiss-cpu lxml beautifulsoup4 dart-fss opendartreader
+pip install -U duckdb sentence-transformers faiss-cpu lxml beautifulsoup4 dart-fss opendartreader streamlit reportlab>=4.0.0
 ```
 
 ### 2) Environment
