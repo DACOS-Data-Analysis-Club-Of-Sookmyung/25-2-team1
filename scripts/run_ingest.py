@@ -1,4 +1,5 @@
 # scripts/run_ingest.py
+
 # 기업명/연도 입력 -> (옵션) seed -> (옵션) overwrite report -> target ingest -> benchmark ingest -> (옵션) QC -> DB 저장
 
 from __future__ import annotations

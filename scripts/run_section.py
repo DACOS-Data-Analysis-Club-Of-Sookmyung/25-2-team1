@@ -1,4 +1,5 @@
 # scripts/run_section.py
+
 from __future__ import annotations
 
 import sys

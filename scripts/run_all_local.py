@@ -1,3 +1,5 @@
+# scripts/run_all_local.py
+
 import os
 import asyncio
 import json
