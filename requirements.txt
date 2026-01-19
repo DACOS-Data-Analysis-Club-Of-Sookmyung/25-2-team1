@@ -8,4 +8,6 @@ python-dotenv
 faiss-cpu
 sentence-transformers
 tqdm
+dart-fss 
 opendartreader
+streamlit

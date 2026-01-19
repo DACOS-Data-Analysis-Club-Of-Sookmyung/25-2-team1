@@ -6,16 +6,12 @@ from src.sections._common.io import load_inputs, pack_evidence
 from src.sections._common.table_templates import render_T1_YOY, render_T_SIMPLE, render_T3_TRACE
 
 def build_ctx(workdir: Path, spec: Dict[str, Any]) -> Dict[str, Any]:
-    inputs = load_inputs(
-        workdir,
-        metrics_path=spec.get("metrics_path"),
-        evidence_path=spec.get("evidence_path"),
-    )
+    inputs = load_inputs(workdir, spec_id=spec["id"], allow_missing_evidence=True)
     meta = inputs["meta"]
     metric_rows = inputs["metric_rows"]
     evidence_rows = inputs["evidence_rows"]
 
-    bs_assets_table = render_T1_YOY(metric_rows, ["TOTAL_ASSETS", "CURRENT_ASSETS", "CASH_AND_CASH_EQUIVALENTS"])
+    bs_assets_table = render_T1_YOY(metric_rows, ["TOTAL_ASSETS", "CURRENT_ASSETS", "CASH_EQ"])
     bs_liabilities_table = render_T1_YOY(metric_rows, ["TOTAL_LIABILITIES", "CURRENT_LIABILITIES", "SHORT_TERM_DEBT"])
     bs_equity_table = render_T1_YOY(metric_rows, ["EQUITY"])
 

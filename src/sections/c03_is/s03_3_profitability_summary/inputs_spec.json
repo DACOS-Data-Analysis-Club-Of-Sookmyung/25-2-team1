@@ -3,7 +3,17 @@
   "section_id": "3.3",
   "title": "수익성 변화 해석",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1600 },
-  "metrics_path": "metrics/metrics_S03_3.json",
-  "evidence_path": "evidence/evidence_S03_3.json"
+  "llm": {
+    "temperature": 0.2,
+    "max_tokens": 800
+  },
+  "evidence_spec": [],
+  "metrics_spec": [
+    "REVENUE",
+    "COGS",
+    "SGA_EXPENSES",
+    "OP_PROFIT",
+    "TAX_EXP",
+    "NET_INCOME"
+  ]
 }

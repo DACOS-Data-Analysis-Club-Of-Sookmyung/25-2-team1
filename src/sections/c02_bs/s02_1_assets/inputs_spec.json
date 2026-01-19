@@ -3,7 +3,20 @@
   "section_id": "2.1",
   "title": "자산 구조 및 변동",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1400 },
-  "metrics_path": "metrics/metrics_S02_1.json",
-  "evidence_path": "evidence/evidence_S02_1.json"
+  "llm": {
+    "temperature": 0.15,
+    "max_tokens": 900
+  },
+  "evidence_spec": [],
+  "metrics_spec": [
+    "TOTAL_ASSETS",
+    "CURRENT_ASSETS",
+    "NON_CURRENT_ASSETS",
+    "CASH_EQ",
+    "AR",
+    "INVENTORIES",
+    "PPE",
+    "ar_turnover",
+    "inventory_turnover"
+  ]
 }

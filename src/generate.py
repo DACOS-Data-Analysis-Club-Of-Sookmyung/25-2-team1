@@ -3,13 +3,16 @@ from __future__ import annotations
 import asyncio
 import importlib
 import json
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.llm.client import OpenAICompatClient
 
 
+# ----------------
 # helpers
+# ----------------
 def read_text(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
@@ -23,38 +26,96 @@ def render_prompt(prompt_md: str, ctx: Dict[str, Any]) -> str:
     return prompt_md.format(**ctx)
 
 
-# core
+def ensure_workdir_layout(workdir: Path) -> None:
+    """
+    팀 규칙:
+    - meta.json은 workdir/meta/meta.json
+    - metrics는 workdir/metrics/
+    - evidence는 workdir/evidence/
+    - summary는 workdir/summary/
+    """
+    (workdir / "meta").mkdir(parents=True, exist_ok=True)
+    (workdir / "metrics").mkdir(parents=True, exist_ok=True)
+    (workdir / "evidence").mkdir(parents=True, exist_ok=True)
+    (workdir / "summary").mkdir(parents=True, exist_ok=True)
+
+
+def build_inputs_via_script(
+    workdir_root: Path,
+    section_dir: Path,
+    company: str,
+    year: int,
+    topk: int = 5,
+    db_path: Path | None = None,
+) -> Path:
+    SECTIONS_ROOT = (Path(__file__).resolve().parent / "sections").resolve()
+    rel = section_dir.resolve().relative_to(SECTIONS_ROOT)  # c01_intro/s01_1_objective
+    section_arg = "/".join(rel.parts)
+
+    cmd = [
+        "python", "scripts/run_section.py",
+        "--company", company,
+        "--year", str(year),
+        "--section", section_arg,
+        "--build",
+        "--workdir", str(workdir_root),
+        "--topk", str(topk),
+    ]
+    if db_path is not None:
+        cmd += ["--db-path", str(db_path)]
+
+    subprocess.run(cmd, check=True)
+
+    return workdir_root
+
+
+
 def run_section(
-    workdir: Path,
+    workdir_root: Path,
     section_dir: Path,
     client: OpenAICompatClient,
     system_rules: str,
     out_dir: Path,
+    *,
+    company: str,
+    year: int,
+    topk: int = 5,
+    db_path: Path | None = None,
+    build_inputs: bool = True,
 ) -> Path:
-    """
-    - 섹션 폴더 내 inputs_spec.json / prompt.md / retriever.py 를 사용
-    - retriever.py 내 build_ctx(workdir, spec)로 ctx 생성
-    - 결과를 outputs/sections/<spec_id>.json 으로 저장
-    """
+    workdir_root = workdir_root.resolve()
+    section_dir = section_dir.resolve()
+
+    # 0) inputs 생성 → section_workdir(out_base)
+    if build_inputs:
+        build_inputs_via_script(
+            workdir_root=workdir_root,
+            section_dir=section_dir,
+            company=company,
+            year=year,
+            topk=topk,
+            db_path=db_path,
+        )
+
+
+    # 1) spec/prompt
     spec = read_json(section_dir / "inputs_spec.json")
     prompt_md = read_text(section_dir / spec["prompt"])
 
-    # build ctx: src/sections 이하 상대경로로 모듈 경로 생성 (중첩 폴더 대응)
+    # 2) retriever import
     SECTIONS_ROOT = (Path(__file__).resolve().parent / "sections").resolve()
-    section_dir = section_dir.resolve()
-    try:
-        rel = section_dir.relative_to(SECTIONS_ROOT)
-    except ValueError as e:
-        raise ValueError(f"section_dir({section_dir})가 SECTIONS_ROOT({SECTIONS_ROOT}) 하위가 아닙니다.") from e
-    pkg = "src.sections." + ".".join(rel.parts)            # e.g. src.sections.c09_swot.s09_1_strength
+    rel = section_dir.relative_to(SECTIONS_ROOT)
+    pkg = "src.sections." + ".".join(rel.parts)
 
     retr = importlib.import_module(pkg + ".retriever")
     if not hasattr(retr, "build_ctx"):
         raise AttributeError(f"{pkg}.retriever 에 build_ctx(workdir, spec) 함수가 없습니다.")
 
-    ctx = retr.build_ctx(workdir=workdir, spec=spec)
+    # ✅ 핵심: workdir_root가 아니라 section_workdir(out_base)를 넘김
+    ctx = retr.build_ctx(workdir=workdir_root, spec=spec)
     user_prompt = render_prompt(prompt_md, ctx)
 
+    # 3) LLM 호출
     llm = spec.get("llm", {})
     raw = client.chat(
         system=system_rules,
@@ -63,13 +124,8 @@ def run_section(
         max_tokens=llm.get("max_tokens", 1600),
     )
 
-    out = {
-        "id": spec["id"],
-        "section_id": spec["section_id"],
-        "title": spec["title"],
-        "content": raw,
-    }
-
+    # 4) 저장
+    out = {"id": spec["id"], "section_id": spec["section_id"], "title": spec["title"], "content": raw}
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{spec['id']}.json"
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -77,23 +133,77 @@ def run_section(
 
 
 async def run_sections_parallel(
-    workdir: Path,
+    workdir_root: Path,
     section_dirs: List[Path],
     client: OpenAICompatClient,
     system_rules: str,
     out_dir: Path,
+    *,
+    company: str,
+    year: int,
+    topk: int = 5,
+    db_path: Path | None = None,
+    build_inputs: bool = True,
+    build_inputs_sequential: bool = True,
 ) -> List[Path]:
-    """
-    병렬 실행: thread executor로 run_section 호출
-    """
+    workdir_root = workdir_root.resolve()
+
+    if build_inputs and build_inputs_sequential:
+        for sdir in section_dirs:
+            build_inputs_via_script(
+                workdir_root=workdir_root,
+                section_dir=sdir.resolve(),
+                company=company,
+                year=year,
+                topk=topk,
+                db_path=db_path,
+            )
+
+        loop = asyncio.get_running_loop()
+        tasks = [
+            loop.run_in_executor(
+                None,
+                lambda sd=sdir: run_section(
+                    workdir_root=workdir_root,
+                    section_dir=sd,
+                    client=client,
+                    system_rules=system_rules,
+                    out_dir=out_dir,
+                    company=company,
+                    year=year,
+                    topk=topk,
+                    db_path=db_path,
+                    build_inputs=False,
+                ),
+            )
+            for sdir in section_dirs
+        ]
+        return await asyncio.gather(*tasks)
+
     loop = asyncio.get_running_loop()
     tasks = [
-        loop.run_in_executor(None, run_section, workdir, sdir, client, system_rules, out_dir)
+        loop.run_in_executor(
+            None,
+            lambda sd=sdir: run_section(
+                workdir_root=workdir_root,
+                section_dir=sd,
+                client=client,
+                system_rules=system_rules,
+                out_dir=out_dir,
+                company=company,
+                year=year,
+                topk=topk,
+                db_path=db_path,
+                build_inputs=build_inputs,
+            ),
+        )
         for sdir in section_dirs
     ]
     return await asyncio.gather(*tasks)
 
-
+# ----------------
+# bridge summary
+# ----------------
 def _parse_chapter_no(section_id: Optional[str]) -> Optional[int]:
     """section_id가 '3.2' 같은 형태라고 가정하고 장 번호(3)만 추출."""
     if not section_id:
@@ -115,9 +225,12 @@ def make_bridge_summary(
 ) -> Path:
     """
     - 섹션 결과(out_dir/<spec_id>.json)를 읽어온 뒤
-    - (1,2) / (3,4,5) / (6,7,8) 세 그룹으로 나눠 LLM을 3번 호출
-    - 저장은 bridge_summary.json 하나에 '장별(chapters)' 구조로 저장
+    - chapter_groups 단위로 LLM을 호출하여 섹션별 1~2문장 요약 생성
+    - 결과를 workdir/summary/bridge_summary.json에 'chapters' 구조로 누적 저장
+    - 마지막에 chapters를 기반으로 bridge_text를 "재생성"하여 저장
     """
+    workdir = workdir.resolve()
+    ensure_workdir_layout(workdir)
 
     # 0) 섹션 결과 수집
     items: List[Dict[str, Any]] = []
@@ -130,7 +243,6 @@ def make_bridge_summary(
         section_id = obj.get("section_id")
         chapter_no = _parse_chapter_no(section_id)
         if chapter_no is None:
-            # 장 번호 파싱 불가한 섹션은 제외(원하면 raise로 바꿔도 됨)
             continue
 
         content = (obj.get("content") or "").strip().replace("\n\n", "\n")
@@ -175,7 +287,7 @@ def make_bridge_summary(
         return json.loads(raw)
 
     # 2) 저장 객체 준비(기존 파일 있으면 이어쓰기)
-    out_path = workdir / "bridge_summary.json"
+    out_path = workdir / "summary" / "bridge_summary.json"
     if out_path.exists():
         try:
             bridge_obj = json.loads(out_path.read_text(encoding="utf-8"))
@@ -218,12 +330,27 @@ def make_bridge_summary(
 
             # chapter_text 재생성(해당 장의 섹션만)
             lines = [f"[CHAPTER SUMMARY {ch}]"]
-            # 섹션 순서대로 출력
-            for sec_id in sorted(sec_map.keys(), key=lambda x: [int(p) if p.isdigit() else p for p in str(x).split(".")]):
+            for sec_id in sorted(
+                sec_map.keys(),
+                key=lambda x: [int(p) if p.isdigit() else p for p in str(x).split(".")]
+            ):
                 title = next((it["title"] for it in group_items if it["section_id"] == sec_id), "")
                 lines.append(f"- {sec_id} {title}: {sec_map[sec_id]}")
             bridge_obj["chapters"][ch_key]["chapter_text"] = "\n".join(lines)
 
-    # 4) 저장
+    # 4) chapters 기반으로 전체 bridge_text "재생성"
+    ch_nums = sorted([int(k) for k in bridge_obj["chapters"].keys() if str(k).isdigit()])
+    if ch_nums:
+        max_ch = max(ch_nums)
+        bridge_lines = [f"[BRIDGE SUMMARY 1-{max_ch}]"]
+        for ch in ch_nums:
+            txt = (bridge_obj["chapters"].get(str(ch), {}) or {}).get("chapter_text", "")
+            if txt:
+                bridge_lines.append(txt)
+        bridge_obj["bridge_text"] = "\n\n".join(bridge_lines).strip()
+    else:
+        bridge_obj["bridge_text"] = ""
+
+    # 5) 저장
     out_path.write_text(json.dumps(bridge_obj, ensure_ascii=False, indent=2), encoding="utf-8")
     return out_path

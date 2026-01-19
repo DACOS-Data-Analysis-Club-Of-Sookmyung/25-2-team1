@@ -1,9 +1,28 @@
 {
-  "id": "c10.s10_2",
+  "id": "c10.s10_2_risk_summary",
   "section_id": "10.2",
   "title": "재무적 리스크 요약",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1500 },
-  "metrics_path": "metrics/metrics_S10_2.json",
-  "evidence_path": "evidence/evidence_S10_2.json"
+  "llm": {
+    "temperature": 0.2,
+    "max_tokens": 900
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": [
+    "REVENUE",
+    "OP_PROFIT",
+    "NET_INCOME",
+    "OCF",
+    "CASH_EQ",
+    "TOTAL_LIABILITIES",
+    "CURRENT_LIABILITIES",
+    "EQUITY",
+
+    "INTEREST_EXP",
+    "SHORT_TERM_DEBT",
+    "LONG_TERM_DEBT",
+    "CURRENT_ASSETS",
+    "INVENTORIES",
+    "TOTAL_ASSETS"
+  ]
 }

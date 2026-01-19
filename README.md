@@ -3,7 +3,6 @@
 
 # DART Financial GenAI Report
 
-DART 사업보고서에서 **텍스트/표를 분리 저장(DuckDB)** 하고, 텍스트 chunk를 **임베딩/검색(FAISS)** 하여 섹션별 LLM 보고서 생성을 돕는 프로젝트입니다.
 
 ## Quickstart (local)
 
@@ -19,9 +18,7 @@ export DART_API_KEY="YOUR_KEY"
 ```
 
 ### 3) Ingest (crawl + normalize + store)
-```bash
-python -m src.cli ingest --corp "삼성전자" --year 2024
-```
+python scripts/run_ingest.py --company "LG전자" --year 2024 --seed-market --overwrite-market --qc
 
 ### 4) Embed (build/update FAISS from DuckDB chunks)
 ```bash

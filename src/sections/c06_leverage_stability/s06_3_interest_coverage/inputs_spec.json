@@ -3,7 +3,10 @@
   "section_id": "6.3",
   "title": "이자보상비율",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1600 },
-  "metrics_path": "metrics/metrics_S06_3.json",
-  "evidence_path": "evidence/evidence_S06_3.json"
+  "llm": {
+    "temperature": 0.15,
+    "max_tokens": 900
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": ["OP_PROFIT", "INTEREST_EXP", "interest_coverage"]
 }

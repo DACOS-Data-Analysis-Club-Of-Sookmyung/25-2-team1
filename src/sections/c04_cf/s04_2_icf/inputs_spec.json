@@ -3,7 +3,16 @@
   "section_id": "4.2",
   "title": "투자활동 현금흐름",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1500 },
-  "metrics_path": "metrics/metrics_S04_2.json",
-  "evidence_path": "evidence/evidence_S04_2.json"
+  "llm": {
+    "temperature": 0.15,
+    "max_tokens": 900
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": [
+    "ICF",
+    "PURCHASE_PPE",
+    "PURCHASE_INTANGIBLES",
+    "PURCHASE_LT_FIN_ASSETS",
+    "DISPOSAL_LT_FIN_ASSETS"
+  ]
 }

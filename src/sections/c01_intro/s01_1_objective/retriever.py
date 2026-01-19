@@ -1,18 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Any
+import json
 
-from src.sections._common.io import load_inputs
 
 def build_ctx(workdir: Path, spec: Dict[str, Any]) -> Dict[str, Any]:
-    inputs = load_inputs(
-        workdir,
-        metrics_path=spec.get("metrics_path"),
-        evidence_path=spec.get("evidence_path"),
-    )
-    meta = inputs["meta"]
+    meta = json.loads((Path(workdir) / "meta" / "meta.json").read_text(encoding="utf-8"))
 
     return {
-        "corp_name": meta.get("corp_name") or meta.get("corp_name_kr") or meta.get("corp_code"),
+        "corp_name": meta.get("corp_name"),
         "bsns_year": meta.get("bsns_year"),
     }

@@ -3,7 +3,22 @@
   "section_id": "7.5",
   "title": "수익성 구조에 대한 종합 해석",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 2000 },
-  "metrics_path": "metrics/metrics_S07_5.json",
-  "evidence_path": "evidence/evidence_S07_5.json"
+  "llm": {
+    "temperature": 0.2,
+    "max_tokens": 1000
+  },
+  "evidence_spec": [{ "type": "biz" }],
+  "metrics_spec": [
+    "asset_turnover",
+    "inventory_turnover",
+    "ar_turnover",
+    "roa",
+    "roe",
+    "roc",
+    "per",
+    "pbr",
+    "psr",
+    "net_margin",
+    "fin_leverage"
+  ]
 }

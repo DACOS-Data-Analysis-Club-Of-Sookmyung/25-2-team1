@@ -1,43 +1,48 @@
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Dict
 import json
 
-from src.sections._common.io import load_inputs
 
 def _read_json(p: Path) -> Dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
+
+def _load_bridge_text(workdir: Path) -> str:
+    p = workdir / "bridge_summary.json"
+    if not p.exists():
+        return ""
+    obj = _read_json(p)
+    return (obj.get("bridge_text") or "").strip()
+
+
+def _load_prev(spec_id: str) -> str:
+    p = Path("outputs/sections") / f"{spec_id}.json"
+    if not p.exists():
+        return ""
+    obj = _read_json(p)
+    return (obj.get("content") or "").strip()
+
+
 def build_ctx(workdir: Path, spec: Dict[str, Any]) -> Dict[str, Any]:
-    inputs = load_inputs(
-        workdir,
-        metrics_path=spec.get("metrics_path"),
-        evidence_path=spec.get("evidence_path"),
-    )
-    meta = inputs["meta"]
+    meta = _read_json(workdir / "meta.json")
+    bridge_text = _load_bridge_text(workdir)
 
-    out_dir = Path("outputs/sections")
+    s1 = _load_prev("c10.s10_1_strength_summary")
+    s2 = _load_prev("c10.s10_2_risk_summary")
 
-    s10_1 = out_dir / "c10.s10_1.json"
-    s10_2 = out_dir / "c10.s10_2.json"
-    financial_strength_summary_text = _read_json(s10_1).get("content","").strip() if s10_1.exists() else "제공 없음"
-    financial_risk_summary_text = _read_json(s10_2).get("content","").strip() if s10_2.exists() else "제공 없음"
-
-    op_path = out_dir / "c09.s09_3.json"
-    th_path = out_dir / "c09.s09_4.json"
-    opportunity_text = _read_json(op_path).get("content","").strip() if op_path.exists() else "제공 없음"
-    threat_text = _read_json(th_path).get("content","").strip() if th_path.exists() else "제공 없음"
-
-    analysis_years = str(meta.get("analysis_years", 1))
-    benchmark_method = str(meta.get("benchmark_method", "동일 업종 내 유사 규모 벤치마크 기업과 비교"))
+    prev_bundle = "\n\n".join([
+        "[10.1 재무적 강점 요약]",
+        s1 if s1 else "제공 없음",
+        "",
+        "[10.2 주의할 점 요약]",
+        s2 if s2 else "제공 없음",
+    ]).strip()
 
     return {
         "corp_name": meta.get("corp_name") or meta.get("corp_name_kr") or meta.get("corp_code"),
         "bsns_year": meta.get("bsns_year"),
-        "financial_strength_summary_text": financial_strength_summary_text,
-        "financial_risk_summary_text": financial_risk_summary_text,
-        "opportunity_text": opportunity_text,
-        "threat_text": threat_text,
-        "analysis_years": analysis_years,
-        "benchmark_method": benchmark_method,
+        "bridge_text": bridge_text,
+        "prev_bundle": prev_bundle,
     }

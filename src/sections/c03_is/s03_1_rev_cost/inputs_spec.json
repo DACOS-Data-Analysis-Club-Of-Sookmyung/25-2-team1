@@ -3,7 +3,10 @@
   "section_id": "3.1",
   "title": "매출 및 비용 구조",
   "prompt": "prompt.md",
-  "llm": { "temperature": 0.2, "max_tokens": 1400 },
-  "metrics_path": "metrics/metrics_S03_1.json",
-  "evidence_path": "evidence/evidence_S03_1.json"
+  "llm": {
+    "temperature": 0.15,
+    "max_tokens": 900
+  },
+  "evidence_spec": [],
+  "metrics_spec": ["REVENUE", "COGS", "GROSS_PROFIT"]
 }
