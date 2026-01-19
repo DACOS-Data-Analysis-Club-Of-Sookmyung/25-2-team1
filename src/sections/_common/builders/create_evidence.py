@@ -19,12 +19,23 @@ def _report_meta_for_evidence(con: duckdb.DuckDBPyConnection, report_id: str) ->
 def _build_evidence_notes_by_metrics(
     con: duckdb.DuckDBPyConnection,
     report_id: str,
-    metrics_json: Dict[str, Any],
+    metrics_json: Any,  
     topk_chunks_per_note: int,
 ) -> Dict[str, Any]:
     line_item_ids = []
-    for r in (metrics_json.get("rows") or []):
-        if r.get("found") and r.get("line_item_id"):
+
+    # ✅ [ADD] metrics_json 방어: dict가 아니면 rows를 안전하게 처리
+    rows_list = []
+    if isinstance(metrics_json, dict):
+        rows_list = metrics_json.get("rows") or []
+    elif isinstance(metrics_json, list):
+        # 혹시 rows만 넘어온 경우
+        rows_list = metrics_json
+    else:
+        rows_list = []
+
+    for r in rows_list:
+        if isinstance(r, dict) and r.get("found") and r.get("line_item_id"):
             line_item_ids.append(r["line_item_id"])
 
     if not line_item_ids:

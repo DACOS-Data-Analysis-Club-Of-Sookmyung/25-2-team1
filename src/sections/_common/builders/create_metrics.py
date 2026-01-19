@@ -54,6 +54,27 @@ def build_metrics_for_section(
     stype = metrics_spec.get("statement_type")
     mode = (metrics_spec.get("periods") or "latest_two").strip()
     items = metrics_spec.get("keys") or []
+
+    # ✅ [ADD] keys(items) 정규화: dict/list/str 섞여도 안전하게 처리
+    # - 기대 형태: [{"key": "...", "label_like": "..."} , ...]
+    # - 허용: ["TOTAL_ASSETS", ...] -> [{"key":"TOTAL_ASSETS"}]
+    # - 허용: {"key":"TOTAL_ASSETS", ...} -> [ {...} ]
+    if isinstance(items, dict):
+        items = [items]
+    elif isinstance(items, list):
+        norm_items: List[Dict[str, Any]] = []
+        for it in items:
+            if isinstance(it, dict):
+                norm_items.append(it)
+            elif isinstance(it, str):
+                norm_items.append({"key": it})
+            else:
+                # list/숫자 등 이상한 타입은 건너뜀(여기서 터지는 걸 방지)
+                continue
+        items = norm_items
+    else:
+        items = []
+
     if not stype or not items:
         return {"report_id": report_id, "rows": []}
 
@@ -63,6 +84,8 @@ def build_metrics_for_section(
 
     out_rows = []
     for it in items:
+        if not isinstance(it, dict):
+            continue
         key = it.get("key")
         label_like = it.get("label_like")
         ifrs_code = it.get("ifrs_code")
