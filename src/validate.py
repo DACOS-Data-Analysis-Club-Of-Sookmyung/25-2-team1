@@ -157,10 +157,11 @@ def validate_ingest_report(con: duckdb.DuckDBPyConnection, report_id: str) -> di
 
     return out
 
-#------------------
+
+#------------------------------
 # 계산 검증 파이프라인
-#------------------
-# validate.py
+#------------------------------
+
 import argparse
 import math
 from dataclasses import dataclass
@@ -450,7 +451,7 @@ def main():
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
-    # 콘솔 출력(코랩에서도 보기 좋게)
+    # 콘솔 출력
     print("=== VALIDATION SUMMARY ===")
     print(summary)
     fails = [c for c in checks if c.level == "FAIL"]

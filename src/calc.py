@@ -14,7 +14,7 @@ def norm_label(s: str) -> str:
 
 
 # ============================================================
-# 1) ACCOUNT_MAP (예린님이 준 그대로)
+# 1) ACCOUNT_MAP
 # ============================================================
 
 ACCOUNT_MAP = [
@@ -127,7 +127,6 @@ def build_account_map_rules(con):
 
 # ============================================================
 # 3) 계산 파이프라인 뷰 생성 (v_fin_long_raw ~ v_financial_ratios)
-#    - 예린님이 준 SQL을 그대로 포함/정리
 # ============================================================
 
 def create_calc_views(con):
@@ -288,7 +287,6 @@ def create_calc_views(con):
     """)
     con.execute("DELETE FROM ratio_requirements;")
 
-    # (예린님 SQL 그대로)
     con.execute(r"""
     INSERT INTO ratio_requirements (ratio_key, ratio_ko, item_key, role, required, note) VALUES
     ('current_ratio', '유동비율', 'CURRENT_ASSETS', 'numerator',  TRUE,  '유동자산/유동부채'),
@@ -710,7 +708,7 @@ def create_calc_views(con):
 
 
 # ============================================================
-# 4) metric_catalog (예린님이 올린 "전체 목록" 그대로)
+# 4) metric_catalog 
 # ============================================================
 
 def create_metric_catalog(con):
@@ -725,17 +723,17 @@ def create_metric_catalog(con):
     );
     """)
 
-    # 예린님 코드 그대로 넣음 (원문 유지)
+    # (polarity 수정)
     con.execute("""
     INSERT INTO metric_catalog VALUES
     ('TOTAL_ASSETS', '자산총계', 'raw', 'KRW', TRUE),
     ('CURRENT_ASSETS', '유동자산', 'raw', 'KRW', TRUE),
     ('CASH_EQ', '현금및현금성자산', 'raw', 'KRW', TRUE),
-    ('AR', '매출채권', 'raw', 'KRW', TRUE),
-    ('INVENTORIES', '재고자산', 'raw', 'KRW', TRUE),
+    ('AR', '매출채권', 'raw', 'KRW', NULL),
+    ('INVENTORIES', '재고자산', 'raw', 'KRW', NULL),
     ('NON_CURRENT_ASSETS', '비유동자산', 'raw', 'KRW', TRUE),
-    ('LONG_TERM_DEBT', '장기차입금', 'raw', 'KRW', TRUE),
-    ('DEFERRED_TAX_LIAB', '이연법인세부채', 'raw', 'KRW', TRUE),
+    ('LONG_TERM_DEBT', '장기차입금', 'raw', 'KRW', FALSE),
+    ('DEFERRED_TAX_LIAB', '이연법인세부채', 'raw', 'KRW', FALSE),
 
     ('EQUITY', '자본총계', 'raw', 'KRW', TRUE),
     ('PARENT_EQUITY', '지배기업 소유주지분', 'raw', 'KRW', TRUE),
@@ -745,20 +743,20 @@ def create_metric_catalog(con):
     ('CAPITAL_STOCK', '자본금', 'raw', 'KRW', TRUE),
 
     ('REVENUE', '매출액', 'raw', 'KRW', TRUE),
-    ('COGS', '매출원가', 'raw', 'KRW', TRUE),
+    ('COGS', '매출원가', 'raw', 'KRW', FALSE),
     ('GROSS_PROFIT', '매출총이익', 'raw', 'KRW', TRUE),
     ('OP_PROFIT', '영업이익', 'raw', 'KRW', TRUE),
     ('PRE_TAX_INCOME', '법인세비용차감전순이익', 'raw', 'KRW', TRUE),
-    ('TAX_EXP', '법인세비용', 'raw', 'KRW', TRUE),
+    ('TAX_EXP', '법인세비용', 'raw', 'KRW', FALSE),
     ('NET_INCOME', '당기순이익', 'raw', 'KRW', TRUE),
-    ('SGA_EXPENSES', '판매비와관리비', 'raw', 'KRW', TRUE),
+    ('SGA_EXPENSES', '판매비와관리비', 'raw', 'KRW', FALSE),
 
     ('OCF', '영업활동현금흐름', 'raw', 'KRW', TRUE),
-    ('ICF', '투자활동현금흐름', 'raw', 'KRW', TRUE),
-    ('FCF_FIN', '재무활동현금흐름', 'raw', 'KRW', TRUE),
-    ('PURCHASE_PPE', '유형자산의 취득', 'raw', 'KRW', TRUE),
-    ('PURCHASE_INTANGIBLES', '무형자산의 취득', 'raw', 'KRW', TRUE),
-    ('PURCHASE_LT_FIN_ASSETS', '장기금융상품의 취득', 'raw', 'KRW', TRUE),
+    ('ICF', '투자활동현금흐름', 'raw', 'KRW', NULL),
+    ('FCF_FIN', '재무활동현금흐름', 'raw', 'KRW', NULL),
+    ('PURCHASE_PPE', '유형자산의 취득', 'raw', 'KRW', NULL),
+    ('PURCHASE_INTANGIBLES', '무형자산의 취득', 'raw', 'KRW', NULL),
+    ('PURCHASE_LT_FIN_ASSETS', '장기금융상품의 취득', 'raw', 'KRW', NULL),
     ('DISPOSAL_LT_FIN_ASSETS', '장기금융상품의 처분', 'raw', 'KRW', TRUE),
 
     ('roe', 'ROE', 'ratio', 'RATIO', TRUE),
