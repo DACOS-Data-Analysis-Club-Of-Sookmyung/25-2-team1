@@ -9,6 +9,10 @@ def _md_table(headers: List[str], rows: List[List[str]]) -> str:
     return "\n".join([head, sep, body])
 
 def render_T1_YOY(metric_rows: Dict[str, Dict[str, Any]], metric_keys: List[str]) -> str:
+    if isinstance(metric_rows, list):
+        metric_rows = {r.get("key"): r for r in metric_rows if isinstance(r, dict) and r.get("key")}
+
+    
     headers = ["항목", "당기", "전기", "증감액", "증감률"]
     rows = []
     for k in metric_keys:

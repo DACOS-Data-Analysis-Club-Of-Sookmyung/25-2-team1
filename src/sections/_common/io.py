@@ -88,9 +88,15 @@ def load_inputs(
             )
 
     metrics_obj = _read_json(mpath)
-    metric_rows = metrics_obj.get("rows") or []
-    if not isinstance(metric_rows, list):
+    rows_list = metrics_obj.get("rows") or []
+    if not isinstance(rows_list, list):
         raise TypeError(f"metrics.rows must be a list: {mpath}")
+
+    # ✅ metric_rows: key -> row dict (table_templates가 기대하는 형태)
+    metric_rows: Dict[str, Any] = {}
+    for r in rows_list:
+        if isinstance(r, dict) and r.get("key"):
+            metric_rows[str(r["key"])] = r
 
     # --------
     # evidence (required unless allow_missing_evidence=True)

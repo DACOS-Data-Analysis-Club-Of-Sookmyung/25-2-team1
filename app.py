@@ -1,11 +1,12 @@
+# app.py
 import sys
 import os
 import asyncio
 from pathlib import Path
+from scripts.build_report_pdf import build_pdf
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-
 import streamlit as st
 
 from src.generate import run_sections_parallel
@@ -53,7 +54,7 @@ st.title("DART 재무 리포트 생성 데모")
 corp_name = st.text_input("기업명 (corp_name)", value="")
 bsns_year = st.number_input("연도 (bsns_year)", value=2024, step=1)
 
-# 전 섹션 자동 실행
+# ✅ 전 섹션 자동 실행
 section_dirs = discover_section_dirs()
 
 if st.button("리포트 생성"):
@@ -73,7 +74,7 @@ if st.button("리포트 생성"):
         with st.spinner("입력 생성 + 섹션 병렬 실행 중..."):
             run_async(lambda: run_sections_parallel(
                 workdir_root=workdir_root,
-                section_dirs=section_dirs,
+                section_dirs=[ROOT / "src" / "sections" / "c02_bs" / "s02_1_assets",],
                 client=client,
                 system_rules=system_rules,
                 out_dir=out_dir,
@@ -82,9 +83,30 @@ if st.button("리포트 생성"):
                 build_inputs=True,
                 build_inputs_sequential=True,
             ))
-
         st.success("완료!")
         st.write("결과 위치:", str(out_dir))
 
+         # ✅ PDF 생성
+        pdf_path = out_dir / f"{corp_name}_{int(bsns_year)}_report.pdf"
+        font_path = Path("/usr/share/fonts/truetype/nanum/NanumGothic.ttf")
+
+        build_pdf(
+            sections_dir=out_dir,     
+            out_pdf=pdf_path,
+            font_path=font_path,
+            report_title=f"{corp_name} {int(bsns_year)} 재무분석 리포트",
+        )
+
+        # ✅ 다운로드 버튼
+        with open(pdf_path, "rb") as f:
+            st.download_button(
+                label="PDF 다운로드",
+                data=f,
+                file_name=pdf_path.name,
+                mime="application/pdf",
+            )
+
     except Exception as e:
-        st.error(f"실행 중 오류: {e}")
+        st.exception(e)
+
+    

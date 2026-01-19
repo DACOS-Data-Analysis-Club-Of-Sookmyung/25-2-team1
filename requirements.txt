@@ -11,3 +11,4 @@ tqdm
 dart-fss 
 opendartreader
 streamlit
+reportlab>=4.0.0

@@ -8,55 +8,27 @@
 - 기준연도: {bsns_year}
 - 자산 항목 표(당기/전기/증감액/증감률 포함): {bs_assets_table}
 - 회전율 지표(당기/전기): {asset_efficiency_table}
-- 주석 근거 텍스트 chunk: {assets_evidence}
-
-[VERY IMPORTANT RULES]
-(원문 그대로 유지)
-
-[OUTPUT FORMAT]
-
-## 2.1 자산 구조 및 변동
-
-(A~E 원문 그대로)
-[ROLE]
-너는 초보 투자자를 위한 “연결 재무상태표(자산) 해설”을 작성한다.
-숫자(표)와 근거(주석)를 분리해 설명하고, 용어를 쉽게 풀어쓴다.
-
-[INPUT]
-
-- 기업: {corp_name}
-- 기준연도: {bsns_year}
-- 자산 항목 표(당기/전기/증감액/증감률 포함): {bs_assets_table}
-  - 내부 매핑용 항목 키:
-    TOTAL_ASSETS,
-    CURRENT_ASSETS,
-    NON_CURRENT_ASSETS,
-    CASH_EQ,
-    AR,
-    INVENTORIES,
-    PPE
-- 회전율 지표(당기/전기): {asset_efficiency_table}
-  - 포함 지표:
-    ar_turnover,
-    inventory_turnover
 - 지표 → 주석 연결(trace): {note_trace_assets}
 - 주석 근거 텍스트 chunk: {assets_evidence}
+
+[ABSOLUTE OUTPUT RULE]
+
+- 아래 메타텍스트/지시문은 절대 출력하지 않는다: [ROLE], [INPUT], [VERY IMPORTANT RULES], [OUTPUT FORMAT]
+- 출력은 반드시 아래 [OUTPUT FORMAT]만 작성한다.
 
 [VERY IMPORTANT RULES]
 
 1. 숫자와 증감은 반드시 {bs_assets_table} 및 {asset_efficiency_table}의 값만 사용한다.
 2. 제공되지 않은 항목(예: 무형자산, 투자부동산, 자산 비중 지표)은 언급하거나 해석하지 않는다.
-3. “왜 증가/감소했는지”에 대한 설명은 {assets_evidence} 근거가 있을 때만 단정적으로 서술한다.
-   - 근거가 없으면 “~로 보인다”, “~일 가능성이 있다” 수준으로만 표현한다.
+3. “왜 증가/감소했는지”는 {assets_evidence} 근거가 있을 때만 단정적으로 서술한다. 근거가 없으면 추정 표현만 쓴다.
 4. 숫자(표) 설명과 주석 근거 설명을 명확히 구분한다.
 5. 용어를 먼저 정의한 뒤, 숫자 변화와 연결해 설명한다.
-6. 주석을 활용한 해석에는 반드시 근거를 표시한다.
-   - 형식: (근거: note_no=…, section_code=…, chunk_id=…)
-7. 출력에는 내부 파라미터명(영문 키)을 절대 노출하지 않는다.
-   - 표, 본문, 주석 목록 모두 포함
-8. 같은 의미의 설명을 반복하지 말고 핵심 위주로 간결하게 작성한다.
-9. OUTPUT FORMAT의 A~E 항목을 모두 포함한다.
-10. 섹션 말미에 이번 섹션에서 참고한 주석(note_no)을 반드시 명시한다.
+6. 주석 근거를 인용할 때는 내부 파라미터명(note_no, section_code, chunk_id)을 절대 쓰지 않는다.
+   - 사람용 표기 형식 예시: (근거: 주석 {{번호}}, {{섹션명}}, 근거ID {{아이디}})
+   - 예: (근거: 주석 1, 자산, 근거ID 현금증가)
+7. 같은 의미의 설명을 반복하지 말고 핵심 위주로 간결하게 작성한다.
+8. OUTPUT FORMAT의 A~E 항목을 모두 포함한다.
+9. 섹션 말미에 이번 섹션에서 참고한 “주석 번호”를 오름차순으로 명시한다.
 
 [OUTPUT FORMAT]
 
